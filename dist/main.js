@@ -535,6 +535,7 @@ __webpack_require__.r(__webpack_exports__);
 //
 //
 //
+//
 
 /* harmony default export */ __webpack_exports__["default"] = ({
   props: ['character', 'targets', 'statNames', 'scenery'],
@@ -576,7 +577,7 @@ __webpack_require__.r(__webpack_exports__);
         } else if (this.selectAction === "Heal") {
           this.selectedTarget[0].tempHitpoints = this.selectedTarget[0].tempHitpoints + 20;
         } else if (this.selectAction === "Terror") {
-          this.selectedTarget[0].sanity = this.selectedTarget[0].sanity - 20;
+          this.selectedTarget[0].tempSanity = this.selectedTarget[0].tempSanity - 20;
         }
       } else if (active + roll >= passive) {
         attackSuccess = true;
@@ -615,7 +616,7 @@ __webpack_require__.r(__webpack_exports__);
         }
 
         if (this.selectAction === "Terror") {
-          this.selectedTarget[0].sanity = this.selectedTarget[0].sanity - 20;
+          this.selectedTarget[0].tempSanity = this.selectedTarget[0].tempSanity - 20;
         }
 
         this.$store.state.resultMessage = "it's a success!";
@@ -827,6 +828,7 @@ __webpack_require__.r(__webpack_exports__);
     addTarget: function addTarget(target) {
       this.charIndex++;
       var newCharacter = {
+        characterType: target.characterType,
         type: target.type,
         name: target.name,
         kind: target.kind,
@@ -846,6 +848,7 @@ __webpack_require__.r(__webpack_exports__);
         tempHitpoints: target.tempHitpoints,
         pPerception: target.pPerception,
         sanity: target.sanity,
+        tempSanity: target.tempSanity,
         charisma: target.charisma,
         weapons: target.weapons,
         saveStat: target.saveStat,
@@ -2475,9 +2478,9 @@ var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _
 
 /***/ }),
 
-/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/EncElement.vue?vue&type=template&id=1f972fe5&":
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/EncElement.vue?vue&type=template&id=2b832382&":
 /*!****************************************************************************************************************************************************************************************************************!*\
-  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/environment/EncElement.vue?vue&type=template&id=1f972fe5& ***!
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/environment/EncElement.vue?vue&type=template&id=2b832382& ***!
   \****************************************************************************************************************************************************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
@@ -2486,16 +2489,16 @@ var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
-var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',[(_vm.character.type === 'creature')?_c('ul',{staticClass:"encounterStats"},[_c('li',[(_vm.character.portrait !== '')?_c('div',[_c('img',{attrs:{"src":_vm.character.portrait}})]):_c('div',[_c('img',{attrs:{"src":"https://awodev.com/images/default-forum-user.png"}})])]),_vm._v(" "),_c('li',[_vm._v("Class: "+_vm._s(_vm.character.characterClass))]),_vm._v(" "),_c('li',[_vm._v("Name: "+_vm._s(_vm.character.name))]),_vm._v(" "),_c('li',[_vm._v("Gender: "+_vm._s(_vm.character.gender))]),_vm._v(" "),_c('li',{staticClass:"statBox"},[_c('ul',{staticClass:"statNames"},_vm._l((_vm.statNames),function(charName,indx){return _c('li',{key:indx},[_vm._v(_vm._s(charName.name))])}),0),_vm._v(" "),_c('ul',{staticClass:"statValues"},_vm._l((_vm.character.stats),function(char,i){return _c('li',{key:i},[_vm._v(_vm._s(char))])}),0)]),_vm._v(" "),_c('li',[_vm._v("MP: "+_vm._s(_vm.character.martialProwess))]),_vm._v(" "),_c('li',[_vm._v("DB: "+_vm._s(_vm.character.damageBonus))]),_vm._v(" "),_c('li',[_vm._v("DEF: "+_vm._s(_vm.character.defenseValue))]),_vm._v(" "),_c('li',[_vm._v("HP: "),_c('div',{staticClass:"hitpointsBar",style:({ width: (_vm.character.hitpoints * 2) + 'px'})},[_c('div',{staticClass:"tempHitpoints",style:({ width: (_vm.character.tempHitpoints * 2) + 'px'})}),_c('div',{staticClass:"tempHtpText"},[_vm._v(_vm._s(_vm.character.tempHitpoints))])]),_c('div',{on:{"click":function($event){_vm.character.tempHitpoints--}}},[_vm._v("Dmg")]),_vm._v(" "),_c('div',{on:{"click":function($event){_vm.character.tempHitpoints++}}},[_vm._v("Heal")])]),_vm._v(" "),_c('li',[_vm._v("Sanity: "+_vm._s(_vm.character.sanity))]),_vm._v(" "),_c('li',[_vm._v("Charisma: "+_vm._s(_vm.character.charisma))])]):_c('ul',{staticClass:"encounterStats"},[_c('li',[(_vm.character.portrait !== '')?_c('div',[_c('img',{attrs:{"src":_vm.character.portrait}})]):_c('div',[_c('img',{attrs:{"src":"https://awodev.com/images/default-forum-user.png"}})])]),_vm._v(" "),_c('li',[_vm._v("Scene Encounter Type: "+_vm._s(_vm.character.name))]),_vm._v(" "),_c('li',{staticClass:"statBox"},[_c('ul',{staticClass:"statNames"},_vm._l((_vm.statNames),function(charName,indx){return _c('li',{key:indx},[_vm._v(_vm._s(charName.name))])}),0),_vm._v(" "),_c('ul',{staticClass:"statValues"},_vm._l((_vm.character.stats),function(char,i){return _c('li',{key:i},[_vm._v(_vm._s(char))])}),0)])]),_vm._v(" "),_c('div',{staticClass:"targetChoice",attrs:{"id":"targetChoice"}},[_vm._v("\n        Target:\n        "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectTarget),expression:"selectTarget"}],on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectTarget=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){return _vm.chooseTarget(_vm.selectTarget)}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Target --")]),_vm._v(" "),_vm._l((_vm.targets),function(target,index){return _c('option',{key:index},[_vm._v(_vm._s(target.name))])})],2)]),_vm._v(" "),(_vm.character.type === 'creature')?_c('div',{staticClass:"actionChoice",attrs:{"id":"actionChoice"}},[_vm._v("\n        Actions:\n        "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectAction),expression:"selectAction"}],attrs:{"id":"actionChoiceSelect"},on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectAction=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){_vm.chooseAction(_vm.targets.indexOf(_vm.character))}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Action --")]),_vm._v(" "),_vm._l((_vm.character.actions),function(action,index){return _c('option',{key:index},[_vm._v(_vm._s(action.name))])})],2)]):_vm._e(),_vm._v(" "),(_vm.character.characterClass === 'pc')?_c('div',{staticClass:"actionChoice",attrs:{"id":"actionChoice"}},[_vm._v("\n        Class Actions:\n        "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectClassAction),expression:"selectClassAction"}],attrs:{"id":"actionChoiceSelect"},on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectClassAction=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){_vm.classAction(_vm.targets.indexOf(_vm.character))}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Class Action --")]),_vm._v(" "),_vm._l((_vm.character.classActions),function(action,index){return _c('option',{key:index},[_vm._v(_vm._s(action.name))])})],2)]):_vm._e(),_vm._v(" "),(_vm.character.type === 'creature')?_c('div',{staticClass:"weaponChoice",attrs:{"id":"weaponChoice"}},[_vm._v("\n        Weapon:\n        "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectWeapon),expression:"selectWeapon"}],on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectWeapon=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){return _vm.chooseWeapon(_vm.selectWeapon)}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Weapon --")]),_vm._v(" "),_vm._l((_vm.character.weapons),function(weapon,i){return _c('option',{key:i},[_vm._v(_vm._s(weapon.name))])})],2)]):_vm._e(),_vm._v(" "),_c('div',{staticClass:"rollButtonContainer"},[(_vm.character.type === 'creature')?_c('button',{staticClass:"rollButton",on:{"click":function($event){return _vm.universalCheck(_vm.attackValue, _vm.defenseValue)}}},[_vm._v("Roll")]):_c('button',{staticClass:"rollButton",on:{"click":function($event){return _vm.sceneryRun(_vm.selectedTarget[0].stats, _vm.character.saveDiff, _vm.character.saveStat, _vm.character.damage)}}},[_vm._v("Roll")])])])}
+var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',[(_vm.character.type === 'creature')?_c('ul',{staticClass:"encounterStats"},[_c('li',[(_vm.character.portrait !== '')?_c('div',[_c('img',{attrs:{"src":_vm.character.portrait}})]):_c('div',[_c('img',{attrs:{"src":"https://awodev.com/images/default-forum-user.png"}})])]),_vm._v(" "),_c('li',[_vm._v("Class: "+_vm._s(_vm.character.characterClass))]),_vm._v(" "),_c('li',[_vm._v("Name: "+_vm._s(_vm.character.name)),(_vm.character.alias !== '')?_c('span',[_vm._v(" \""+_vm._s(_vm.character.alias)+"\"")]):_vm._e()]),_vm._v(" "),_c('li',[_vm._v("Gender: "+_vm._s(_vm.character.gender))]),_vm._v(" "),_c('li',{staticClass:"statBox"},[_c('ul',{staticClass:"statNames"},_vm._l((_vm.statNames),function(charName,indx){return _c('li',{key:indx},[_vm._v(_vm._s(charName.name))])}),0),_vm._v(" "),_c('ul',{staticClass:"statValues"},_vm._l((_vm.character.stats),function(char,i){return _c('li',{key:i},[_vm._v(_vm._s(char))])}),0)]),_vm._v(" "),_c('li',[_vm._v("MP: "+_vm._s(_vm.character.martialProwess))]),_vm._v(" "),_c('li',[_vm._v("DB: "+_vm._s(_vm.character.damageBonus))]),_vm._v(" "),_c('li',[_vm._v("DEF: "+_vm._s(_vm.character.defenseValue))]),_vm._v(" "),_c('li',[_vm._v("HP: "),_c('div',{staticClass:"hitpointsBar",style:({ width: (_vm.character.hitpoints * 2) + 'px'})},[_c('div',{staticClass:"tempHitpoints",style:({ width: (_vm.character.tempHitpoints * 2) + 'px'})}),_c('div',{staticClass:"tempHtpText"},[_vm._v(_vm._s(_vm.character.tempHitpoints))])]),_c('div',{on:{"click":function($event){_vm.character.tempHitpoints--}}},[_vm._v("Dmg")]),_vm._v(" "),_c('div',{on:{"click":function($event){_vm.character.tempHitpoints++}}},[_vm._v("Heal")])]),_vm._v(" "),_c('li',[_vm._v("Sanity: "),_c('div',{staticClass:"hitpointsBar",style:({ width: (_vm.character.sanity * 2) + 'px'})},[_c('div',{staticClass:"tempSanity",style:({ width: (_vm.character.tempSanity * 2) + 'px'})}),_c('div',{staticClass:"tempHtpText"},[_vm._v(_vm._s(_vm.character.tempSanity))])]),_c('div',{on:{"click":function($event){_vm.character.tempSainity--}}},[_vm._v("Dmg")]),_vm._v(" "),_c('div',{on:{"click":function($event){_vm.character.tempSanity++}}},[_vm._v("Heal")])]),_vm._v(" "),_c('li',[_vm._v("Charisma: "+_vm._s(_vm.character.charisma))])]):_c('ul',{staticClass:"encounterStats"},[_c('li',[(_vm.character.portrait !== '')?_c('div',[_c('img',{attrs:{"src":_vm.character.portrait}})]):_c('div',[_c('img',{attrs:{"src":"https://awodev.com/images/default-forum-user.png"}})])]),_vm._v(" "),_c('li',[_vm._v("Scene Encounter Type: "+_vm._s(_vm.character.name))]),_vm._v(" "),_c('li',{staticClass:"statBox"},[_c('ul',{staticClass:"statNames"},_vm._l((_vm.statNames),function(charName,indx){return _c('li',{key:indx},[_vm._v(_vm._s(charName.name))])}),0),_vm._v(" "),_c('ul',{staticClass:"statValues"},_vm._l((_vm.character.stats),function(char,i){return _c('li',{key:i},[_vm._v(_vm._s(char))])}),0)])]),_vm._v(" "),_c('div',{staticClass:"targetChoice",attrs:{"id":"targetChoice"}},[_vm._v("\n        Target:\n        "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectTarget),expression:"selectTarget"}],on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectTarget=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){return _vm.chooseTarget(_vm.selectTarget)}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Target --")]),_vm._v(" "),_vm._l((_vm.targets),function(target,index){return _c('option',{key:index},[_vm._v(_vm._s(target.name))])})],2)]),_vm._v(" "),(_vm.character.type === 'creature')?_c('div',{staticClass:"actionChoice",attrs:{"id":"actionChoice"}},[_vm._v("\n        Actions:\n        "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectAction),expression:"selectAction"}],attrs:{"id":"actionChoiceSelect"},on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectAction=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){_vm.chooseAction(_vm.targets.indexOf(_vm.character))}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Action --")]),_vm._v(" "),_vm._l((_vm.character.actions),function(action,index){return _c('option',{key:index},[_vm._v(_vm._s(action.name))])})],2)]):_vm._e(),_vm._v(" "),(_vm.character.characterType === 'pc')?_c('div',{staticClass:"actionChoice",attrs:{"id":"actionChoice"}},[_vm._v("\n        Class Actions:\n        "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectClassAction),expression:"selectClassAction"}],attrs:{"id":"actionChoiceSelect"},on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectClassAction=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){_vm.classAction(_vm.targets.indexOf(_vm.character))}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Class Action --")]),_vm._v(" "),_vm._l((_vm.character.classActions),function(action,index){return _c('option',{key:index},[_vm._v(_vm._s(action.name))])})],2)]):_vm._e(),_vm._v(" "),(_vm.character.type === 'creature')?_c('div',{staticClass:"weaponChoice",attrs:{"id":"weaponChoice"}},[_vm._v("\n        Weapon:\n        "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectWeapon),expression:"selectWeapon"}],on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectWeapon=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){return _vm.chooseWeapon(_vm.selectWeapon)}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Weapon --")]),_vm._v(" "),_vm._l((_vm.character.weapons),function(weapon,i){return _c('option',{key:i},[_vm._v(_vm._s(weapon.name))])})],2)]):_vm._e(),_vm._v(" "),_c('div',{staticClass:"rollButtonContainer"},[(_vm.character.type === 'creature')?_c('button',{staticClass:"rollButton",on:{"click":function($event){return _vm.universalCheck(_vm.attackValue, _vm.defenseValue)}}},[_vm._v("Roll")]):_c('button',{staticClass:"rollButton",on:{"click":function($event){return _vm.sceneryRun(_vm.selectedTarget[0].stats, _vm.character.saveDiff, _vm.character.saveStat, _vm.character.damage)}}},[_vm._v("Roll")])])])}
 var staticRenderFns = []
 
 
 
 /***/ }),
 
-/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/Encounter.vue?vue&type=template&id=6adc322a&":
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/Encounter.vue?vue&type=template&id=2b005701&":
 /*!***************************************************************************************************************************************************************************************************************!*\
-  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/environment/Encounter.vue?vue&type=template&id=6adc322a& ***!
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/environment/Encounter.vue?vue&type=template&id=2b005701& ***!
   \***************************************************************************************************************************************************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
@@ -17844,7 +17847,7 @@ __webpack_require__.r(__webpack_exports__);
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _EncElement_vue_vue_type_template_id_1f972fe5___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./EncElement.vue?vue&type=template&id=1f972fe5& */ "./src/components/environment/EncElement.vue?vue&type=template&id=1f972fe5&");
+/* harmony import */ var _EncElement_vue_vue_type_template_id_2b832382___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./EncElement.vue?vue&type=template&id=2b832382& */ "./src/components/environment/EncElement.vue?vue&type=template&id=2b832382&");
 /* harmony import */ var _EncElement_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./EncElement.vue?vue&type=script&lang=js& */ "./src/components/environment/EncElement.vue?vue&type=script&lang=js&");
 /* empty/unused harmony star reexport *//* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
 
@@ -17856,8 +17859,8 @@ __webpack_require__.r(__webpack_exports__);
 
 var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__["default"])(
   _EncElement_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__["default"],
-  _EncElement_vue_vue_type_template_id_1f972fe5___WEBPACK_IMPORTED_MODULE_0__["render"],
-  _EncElement_vue_vue_type_template_id_1f972fe5___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  _EncElement_vue_vue_type_template_id_2b832382___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _EncElement_vue_vue_type_template_id_2b832382___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
   false,
   null,
   null,
@@ -17883,19 +17886,19 @@ __webpack_require__.r(__webpack_exports__);
 
 /***/ }),
 
-/***/ "./src/components/environment/EncElement.vue?vue&type=template&id=1f972fe5&":
+/***/ "./src/components/environment/EncElement.vue?vue&type=template&id=2b832382&":
 /*!**********************************************************************************!*\
-  !*** ./src/components/environment/EncElement.vue?vue&type=template&id=1f972fe5& ***!
+  !*** ./src/components/environment/EncElement.vue?vue&type=template&id=2b832382& ***!
   \**********************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_EncElement_vue_vue_type_template_id_1f972fe5___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../../node_modules/vue-loader/lib??vue-loader-options!./EncElement.vue?vue&type=template&id=1f972fe5& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/EncElement.vue?vue&type=template&id=1f972fe5&");
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_EncElement_vue_vue_type_template_id_1f972fe5___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_EncElement_vue_vue_type_template_id_2b832382___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../../node_modules/vue-loader/lib??vue-loader-options!./EncElement.vue?vue&type=template&id=2b832382& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/EncElement.vue?vue&type=template&id=2b832382&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_EncElement_vue_vue_type_template_id_2b832382___WEBPACK_IMPORTED_MODULE_0__["render"]; });
 
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_EncElement_vue_vue_type_template_id_1f972fe5___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_EncElement_vue_vue_type_template_id_2b832382___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
 
 
 
@@ -17910,7 +17913,7 @@ __webpack_require__.r(__webpack_exports__);
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _Encounter_vue_vue_type_template_id_6adc322a___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Encounter.vue?vue&type=template&id=6adc322a& */ "./src/components/environment/Encounter.vue?vue&type=template&id=6adc322a&");
+/* harmony import */ var _Encounter_vue_vue_type_template_id_2b005701___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Encounter.vue?vue&type=template&id=2b005701& */ "./src/components/environment/Encounter.vue?vue&type=template&id=2b005701&");
 /* harmony import */ var _Encounter_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Encounter.vue?vue&type=script&lang=js& */ "./src/components/environment/Encounter.vue?vue&type=script&lang=js&");
 /* empty/unused harmony star reexport *//* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
 
@@ -17922,8 +17925,8 @@ __webpack_require__.r(__webpack_exports__);
 
 var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__["default"])(
   _Encounter_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__["default"],
-  _Encounter_vue_vue_type_template_id_6adc322a___WEBPACK_IMPORTED_MODULE_0__["render"],
-  _Encounter_vue_vue_type_template_id_6adc322a___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  _Encounter_vue_vue_type_template_id_2b005701___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _Encounter_vue_vue_type_template_id_2b005701___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
   false,
   null,
   null,
@@ -17949,19 +17952,19 @@ __webpack_require__.r(__webpack_exports__);
 
 /***/ }),
 
-/***/ "./src/components/environment/Encounter.vue?vue&type=template&id=6adc322a&":
+/***/ "./src/components/environment/Encounter.vue?vue&type=template&id=2b005701&":
 /*!*********************************************************************************!*\
-  !*** ./src/components/environment/Encounter.vue?vue&type=template&id=6adc322a& ***!
+  !*** ./src/components/environment/Encounter.vue?vue&type=template&id=2b005701& ***!
   \*********************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Encounter_vue_vue_type_template_id_6adc322a___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../../node_modules/vue-loader/lib??vue-loader-options!./Encounter.vue?vue&type=template&id=6adc322a& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/Encounter.vue?vue&type=template&id=6adc322a&");
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Encounter_vue_vue_type_template_id_6adc322a___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Encounter_vue_vue_type_template_id_2b005701___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../../node_modules/vue-loader/lib??vue-loader-options!./Encounter.vue?vue&type=template&id=2b005701& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/Encounter.vue?vue&type=template&id=2b005701&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Encounter_vue_vue_type_template_id_2b005701___WEBPACK_IMPORTED_MODULE_0__["render"]; });
 
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Encounter_vue_vue_type_template_id_6adc322a___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Encounter_vue_vue_type_template_id_2b005701___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
 
 
 
@@ -18272,6 +18275,7 @@ var store = new vuex__WEBPACK_IMPORTED_MODULE_1__["default"].Store({
     storyElements: [],
     characterList: [{
       "portrait": 'https://i.kinja-img.com/gawker-media/image/upload/s--NdbChKcZ--/c_scale,f_auto,fl_progressive,q_80,w_800/18j3zwhxy85iyjpg.jpg',
+      "characterType": "pc",
       "characterClass": "Guardian",
       "type": "creature",
       "name": "Rykha",
@@ -18293,6 +18297,7 @@ var store = new vuex__WEBPACK_IMPORTED_MODULE_1__["default"].Store({
       "hitpoints": 75,
       "tempHitpoints": 75,
       "sanity": 50,
+      "tempSanity": 50,
       "charisma": 8,
       "actions": [{
         "name": "Attack"
@@ -18348,6 +18353,7 @@ var store = new vuex__WEBPACK_IMPORTED_MODULE_1__["default"].Store({
       }]
     }, {
       "portrait": 'https://cdnb.artstation.com/p/assets/images/images/005/395/785/large/anthony-l-m-barbarian-massacre-anthony-lm-ss.jpg?1490724835',
+      "characterType": "pc",
       "characterClass": "Hunter",
       "type": "creature",
       "name": "Harold",
@@ -18367,8 +18373,9 @@ var store = new vuex__WEBPACK_IMPORTED_MODULE_1__["default"].Store({
       "damageBonus": 6,
       "defenseValue": 15,
       "hitpoints": 70,
-      "tempHitpoints": 70,
+      "tempHitpoints": 47,
       "sanity": 60,
+      "tempSanity": 48,
       "charisma": 8,
       "actions": [{
         "name": "Attack"
@@ -18424,6 +18431,7 @@ var store = new vuex__WEBPACK_IMPORTED_MODULE_1__["default"].Store({
       }]
     }, {
       "portrait": 'https://i.etsystatic.com/7197050/d/il/c900fa/1615953936/il_340x270.1615953936_pgtl.jpg?version=0',
+      "characterType": "pc",
       "characterClass": "Shaman",
       "type": "creature",
       "name": "Yorubo",
@@ -18445,6 +18453,7 @@ var store = new vuex__WEBPACK_IMPORTED_MODULE_1__["default"].Store({
       "hitpoints": 70,
       "tempHitpoints": 70,
       "sanity": 60,
+      "tempSanity": 60,
       "charisma": 12,
       "actions": [{
         "name": "Attack"

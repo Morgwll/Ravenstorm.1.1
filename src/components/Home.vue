@@ -1,28 +1,9 @@
 <template>
-    <div>
-        <h1>Home</h1>
-        <signin-login></signin-login>
+  <div class="mainWrapper">
+    <div class="mainBanner">
+      <h1>Home</h1>
+      <h3>Welcome to Grim Windmill</h3>
+      <h4>This application will allow Storytellers run tabletop Roleplaying games on the go, just by using this app on their mobile or tablet.</h4>
     </div>
+  </div>
 </template>
-<script>
-    import signinLogin from './SigninLogin.vue';
-    export default {
-        components: {
-            signinLogin
-        },
-        data() {
-            return {}
-        },
-        methods: {
-            popup() {
-                let modal = document.getElementById('loginModal');
-                setTimeout(() => {
-                    modal.classList.add('revealed')
-                }, 2000);
-            }
-        },
-        mounted() {
-            this.popup()
-        }
-    }
-</script>
