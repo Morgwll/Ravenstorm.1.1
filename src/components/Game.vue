@@ -20,10 +20,10 @@
     </div>
     <div class="hidden" id="loadGameSection">
       <h4>Load Game</h4>Available games
-      <select v-model="chosenGame.name">
+      <select v-model="selectedGame" @change="populateGame(selectedGame)">
+        <option disabled selected>-- Choose your saved game --</option>
         <option v-for="(game, index) in gamesInfo" :key="index" :value="game.name">{{ game.name }}</option>
       </select>
-      load: {{ chosenGame.name }}
       <div class="buttonContainer">
         <router-link
           tag="button"
@@ -40,25 +40,34 @@ export default {
   data() {
     let settingInfo = this.$store.state.worlds;
     let gamesInfo = this.$store.state.games;
+    let selectedGame = [];
 
     function selectGame(meh) {}
     return {
       settingInfo,
       gamesInfo,
+      selectedGame,
       nav: [
         { name: "Add Characters", route: "/character-creation" },
         { name: "Load Game", route: "/loaded" }
-      ],
-      chosenGame: {
-        name: null
-      }
+      ]
     };
   },
   methods: {
     selectGame(meh) {
-      let selected = document.getElementById("gameSelector").value;
       console.log(meh);
-      console.log(selected);
+      console.log(this.selectedGame);
+    },
+    populateGame(meh) {
+      this.selectedGame = meh;
+      const chosenGame = this.gamesInfo.find(game => {
+        return game;
+      });
+      this.$store.state.characterList.push(chosenGame.contents.characters);
+      this.$store.state.characterList.push(chosenGame.contents.plots);
+      this.$store.state.characterList.push(chosenGame.notes);
+      this.$store.state.characterList.push(chosenGame.synopsis);
+      this.$store.state.characterList.push(chosenGame.name);
     },
     revealNew() {
       document.getElementById("newGameSection").style.display = "block";
@@ -71,8 +80,3 @@ export default {
   }
 };
 </script>
-<style lang="scss">
-.hidden {
-  display: none;
-}
-</style>

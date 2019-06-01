@@ -1,9 +1,22 @@
 <template>
-  <div class="mainWrapper">
+  <div>
     <div class="mainBanner">
-      <h1>Home</h1>
-      <h3>Welcome to Grim Windmill</h3>
-      <h4>This application will allow Storytellers run tabletop Roleplaying games on the go, just by using this app on their mobile or tablet.</h4>
+      <img :src="pageBanner.image">
+      <div class="bannerText">
+        <h1>{{ pageBanner.h1 }}</h1>
+        <h3>{{ pageBanner.h3 }}</h3>
+      </div>
+      <div class="mainWrapper contentText" v-html="mainPageText"></div>
     </div>
   </div>
 </template>
+<script>
+export default {
+  data() {
+    return {
+      pageBanner: this.$store.state.mainPageBanner,
+      mainPageText: this.$store.state.mainPageText
+    };
+  }
+};
+</script>

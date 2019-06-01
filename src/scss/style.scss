@@ -6,10 +6,14 @@ body {
   height: 100%;
   margin: 0;
 }
-.mainWrapper {
+.mainWrapper,
+.menuWrapper {
   width: 100%;
   max-width: 1220px;
   margin: 0 auto;
+}
+.mainWrapper {
+  min-height: calc(100vh - 100px);
 }
 .mainNav {
   display: inline-flex;
@@ -23,6 +27,42 @@ body {
       text-decoration: none;
     }
   }
+}
+.menuLink {
+  cursor: pointer;
+  transition: 0.2s;
+  &:hover {
+    transform: scale(1.2);
+  }
+}
+.mainBanner {
+  position: relative;
+  width: 100%;
+  img {
+    width: 100%;
+  }
+  .bannerText {
+    color: #fff;
+    position: absolute;
+    left: 50px;
+    top: 20%;
+    h1 {
+      font-size: 6rem;
+      margin: 30px 0;
+    }
+    h3 {
+      max-width: 600px;
+    }
+  }
+}
+.ref {
+  font-style: italic;
+  font-size: 0.8rem;
+}
+.contentText {
+  width: calc(100% - 140px);
+  max-width: 1220px;
+  margin: 0 auto;
 }
 .encounterList {
   padding-left: 0;
@@ -43,7 +83,7 @@ body {
   top: 60px;
   width: 120px;
   transition: 0.3s;
-
+  z-index: 2;
   ul {
     list-style-type: none;
     overflow-x: hidden;
@@ -189,6 +229,7 @@ body {
   border: 1px solid #000;
   border-radius: 4px;
   position: relative;
+  margin: 0 5px;
 }
 .tempHitpoints {
   background-color: #36ad18;
@@ -219,8 +260,10 @@ body {
   width: 100%;
   max-width: 300px;
   flex-direction: column;
+  max-width: 270px;
   margin: 10px 0;
-  display: none;
+  box-sizing: border-box;
+  //display: none;
 }
 .statNames,
 .statValues {
@@ -237,14 +280,21 @@ body {
   }
 }
 .statNames {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.6rem;
   li {
-    margin: 5px 5px 0 5px;
+    margin: 2px;
   }
 }
 .statValues {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   font-size: 2.1rem;
   li {
-    margin: 0px 5px 5px 5px;
+    margin: 0px 2px 5px 2px;
   }
 }
 .weaponChoice {
@@ -364,6 +414,49 @@ body {
 .signIn {
   display: none;
 }
+.flexor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin: 5px 0;
+}
+.flexCond {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  .statBar {
+    margin: 10px 0;
+    @media only screen and (max-width: 768px) {
+      justify-content: left;
+    }
+  }
+  @media only screen and (max-width: 768px) {
+    display: block;
+    justify-content: left;
+  }
+}
+.incDec {
+  margin: 5px;
+  padding: 4px;
+  border: 1px solid #4c3823;
+  background-color: #f2eae3;
+}
+.martialStats {
+  width: calc(30% - 10px);
+  margin: 5px;
+  text-align: center;
+  box-sizing: border-box;
+  padding: 5px;
+  border: 2px solid #4c3823;
+  border-radius: 5px;
+  background-color: #c1c1c1;
+  font-size: 0.6rem;
+  span {
+    font-size: 2.2rem;
+  }
+}
 .revealed {
   display: flex;
   flex-direction: column;
@@ -384,7 +477,7 @@ body {
   cursor: pointer;
 }
 .loadedDisplayPanel {
-  width: calc(100% - 80px);
+  width: calc(100% - 140px);
   max-width: 950px;
   border: 3px solid #4c3823;
   background-color: rgba(191, 127, 63, 0.8);
@@ -431,4 +524,14 @@ body {
   justify-content: center;
   align-items: start;
   margin: 10px 0;
+}
+.footerSection {
+  background-color: #000;
+  box-sizing: border-box;
+  padding: 50px;
+  margin-top: 30px;
+  width: 100%;
+  .menuLink {
+    color: #fff;
+  }
 }

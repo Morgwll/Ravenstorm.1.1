@@ -56,27 +56,38 @@
         </ul>
       </div>
     </div>
-    <div v-if="shown !== ''" class="loadedDisplayPanel">
-      <h2>{{ shown.characterClass }}</h2>
-      <div class="loadedDisplayContainer">
-        <img :src="portraitChooser(shown)">
-        <div class="description" v-html="shown.description"></div>
+    <div class="contentText" v-if="story === ''">
+      <h2>This is the Story Panel</h2>
+      <h4>On the left hand side you will find some tags with certain symbols that will allow you to build the adventure you want to tell.</h4>
+      <p>The left menu has the following options, in descending order: Plot Menu, Bestiary, Gear Info Menu, Supplies Menu, Incantations Menu, Pantheon Menu and Locations Menu.</p>
+      <p>The plot menu will allow you to automatically generate either a Main plot or a minor local plot. Main plots are world ending scenarios and serve as the column, more relevant than all the other plots put together. Failing to complete this challenge will change the world as we know it in dramatic ways (we advise not to just blow the whole thing up, as you can build on the challenging ashes of a dystopian future). Minor plots are stories that may or may not be related to the main plot but are simpler, more familiar quests. We strongly believe that a great campaign is a mixture of both.</p>
+      <p>Click or drag the elements you want to see or add to the story.</p>
+      <p>the Bestiary, Gear, Inventory, Incantations and Pantheon menus offer info and prices on goods or supernatural and divine manifestations. The Locations menu will randomly supply with a layout for a location, with suggestions on what npcs, creatures or environmental hazards could be involved in them.</p>
+    </div>
+    <div v-else>
+      <div v-if="shown !== ''" class="loadedDisplayPanel">
+        <h2>{{ shown.characterClass }}</h2>
+        <div class="loadedDisplayContainer">
+          <img :src="portraitChooser(shown)">
+          <div class="description" v-html="shown.description"></div>
+        </div>
+      </div>
+      <div v-if="shown === ''" class="loadedDisplayPanel">
+        <ul>
+          <li
+            v-for="(storyElement, index) of $store.state.storyElements"
+            :key="index"
+            class="storyBlock"
+          >
+            <div class="storyRemoval" @click="removeStory(storyElement)">
+              <i class="fa fa-times"></i>
+            </div>
+            <div v-html="storyElement" class="story"></div>
+          </li>
+        </ul>
       </div>
     </div>
-    <div v-else-if="shown === ''" class="loadedDisplayPanel">
-      <ul>
-        <li
-          v-for="(storyElement, index) of $store.state.storyElements"
-          :key="index"
-          class="storyBlock"
-        >
-          <div class="storyRemoval" @click="removeStory(storyElement)">
-            <i class="fa fa-times"></i>
-          </div>
-          <div v-html="storyElement" class="story"></div>
-        </li>
-      </ul>
-    </div>
+
     <div class="buttonContainer">
       <router-link tag="button" to="/encounter">Go to Encounter</router-link>
     </div>

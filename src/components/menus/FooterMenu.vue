@@ -8,7 +8,6 @@
         v-for="(menu, index) in mainmenu"
         :key="index"
       >{{ menu.name }}</router-link>
-      <div class="menuLink" @click="loadLogin()">Login/Register</div>
     </ul>
   </div>
 </template>
@@ -17,9 +16,9 @@ export default {
   data() {
     return {
       mainmenu: [
-        { name: "Home", route: "/" },
-        { name: "Game", route: "/game" },
-        { name: "Tutorial", route: "/tutorial" }
+        { name: "Contact", route: "/contact" },
+        { name: "About", route: "/about" },
+        { name: "Privacy Policy", route: "/privacy-policy" }
       ]
     };
   },

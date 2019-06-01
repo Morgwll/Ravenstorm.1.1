@@ -182,8 +182,7 @@ export default {
     }
   },
   mounted() {
-    this.targets = [];
-    for (let character of this.characters) {
+    for (let character of this.$store.state.characterList[0]) {
       this.addTarget(character);
     }
   }
