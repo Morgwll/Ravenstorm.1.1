@@ -99,7 +99,7 @@ import plots from "../../data/plots.json";
 import mixins from "../../mixins.js";
 export default {
   data() {
-    let chosenWorld = 0;
+    let chosenWorld = this.$store.state.chosenWorld;
     const storyEls = this.$store.state.worlds[chosenWorld].environment.plots;
     const beings = this.$store.state.worlds[chosenWorld].npcs.concat(
       this.$store.state.worlds[chosenWorld].creatures

@@ -60,6 +60,7 @@
     <div class="buttonContainer">
       <button @click="randomizeOrder(targets)">Randomize initiative</button>
       <router-link tag="button" to="/loaded">Back to Loaded</router-link>
+      <button @click="saveCharacters(targets)">Save Characters</button>
     </div>
     <div class="modalOverlay" id="modalOverlay">
       <div class="rollModal">
@@ -78,6 +79,7 @@
 <script>
 import mixins from "../../mixins.js";
 import encounterElement from "./EncElement.vue";
+import axios from "axios";
 
 export default {
   components: {
@@ -88,7 +90,7 @@ export default {
       characters: this.$store.state.characterList,
       statNames: this.$store.state.char.stats,
       targets: this.$store.state.targets,
-      scenery: this.$store.state.selectedGame.scenery,
+      scenery: this.$store.state.selectedGame.npcs,
       creatures: true,
       encounter: this.$store.state.selectedGame.npcs,
       targetDefense: null,
@@ -152,17 +154,24 @@ export default {
     npcMenu() {
       this.hideRightMenu();
       this.creatures = true;
-      this.encounter = this.$store.state.selectedGame.npcs;
+      this.encounter = this.$store.state.worlds[
+        this.$store.state.chosenWorld
+      ].npcs;
     },
     monsterMenu() {
       this.hideRightMenu();
       this.creatures = true;
-      this.encounter = this.$store.state.selectedGame.creatures;
+      this.encounter = this.$store.state.worlds[
+        this.$store.state.chosenWorld
+      ].creatures;
     },
     sceneryMenu() {
       this.hideRightMenu();
       this.creatures = false;
-      this.encounter = this.$store.state.selectedGame.creatures;
+      this.encounter = this.$store.state.worlds[
+        this.$store.state.chosenWorld
+      ].scenery;
+      this.scenery = this.encounter;
     },
     genderizer() {
       let boolean = Math.random() >= 0.5;
@@ -179,6 +188,51 @@ export default {
     hideRightMenu() {
       let rightMenu = document.getElementById("rightMenu");
       rightMenu.classList.toggle("hiddenRightMenu");
+    },
+    saveCharacters(targetList) {
+      let characters = [];
+      for (let character of targetList) {
+        if (character.characterType === "pc") {
+          characters.push(character);
+        }
+      }
+      /*axios
+        .get("https://fantasy-storyteller-b92e8.firebaseio.com/")
+        .then(response => (this.$store.state.games = response));
+      if (this.$store.state.userLogin === true) {
+        this.$store.state.characterList[this.$store.state.chosenGame] = [];
+        this.$store.state.characterList[this.$store.state.chosenGame].push(
+          characters
+        );
+        console.log(
+          "characters in List after push",
+          this.$store.state.characterList[0]
+        );
+        console.log("https://fantasy-storyteller-b92e8.firebaseio.com/");
+      }*/
+      axios
+        .get("https://fantasy-storyteller-b92e8.firebaseio.com/", {
+          headers: {
+            "Access-Control-Allow-Origin": "*"
+          },
+          proxy: {
+            host: "104.236.174.88",
+            port: 3128
+          }
+        })
+        .then(function(response) {
+          console.log("response is : " + response.data);
+        })
+        .catch(function(error) {
+          if (error.response) {
+            console.log(error.response.headers);
+          } else if (error.request) {
+            console.log(error.request);
+          } else {
+            console.log(error.message);
+          }
+          console.log(error.config);
+        });
     }
   },
   mounted() {

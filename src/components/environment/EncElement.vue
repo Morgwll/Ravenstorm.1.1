@@ -26,7 +26,7 @@
       </li>
       <li class="flexor">
         <div class="martialStats">
-          War Prowess:
+          Martial Prowess:
           <span>{{ character.martialProwess }}</span>
         </div>
         <div class="martialStats">
@@ -54,7 +54,7 @@
             <div class="tempSanity" :style="{ width: (character.tempSanity * 2) + 'px'}"></div>
             <div class="tempHtpText">{{ character.tempSanity }}</div>
           </div>
-          <div class="incDec" @click="character.tempSainity--">Dmg</div>
+          <div class="incDec" @click="character.tempSanity--">Dmg</div>
           <div class="incDec" @click="character.tempSanity++">Heal</div>
         </div>
       </li>
@@ -84,38 +84,43 @@
       Target:
       <select v-model="selectTarget" @change="chooseTarget(selectTarget)">
         <option default disabled selected>-- Select Target --</option>
+        <option>Environment</option>
         <option v-for="(target, index) in targets" :key="index">{{ target.name }}</option>
       </select>
     </div>
-    <div id="actionChoice" class="actionChoice" v-if="character.type === 'creature'">
-      Actions:
-      <select
-        v-model="selectAction"
-        id="actionChoiceSelect"
-        @change="chooseAction(targets.indexOf(character))"
-      >
-        <option default disabled selected>-- Select Action --</option>
-        <option v-for="(action, index) in character.actions" :key="index">{{ action.name }}</option>
-      </select>
+    <div v-if="selectedTarget">
+      <div id="actionChoice" class="actionChoice" v-if="character.characterType === 'pc'">
+        Class Actions:
+        <select
+          v-model="selectedClassAction"
+          id="actionChoiceSelect"
+          @change="classAction(targets.indexOf(character))"
+        >
+          <option default disabled selected>-- Select Class Action --</option>
+          <option v-for="(action, index) in character.classActions" :key="index">{{ action.name }}</option>
+        </select>
+      </div>
+      <div id="actionChoice" class="actionChoice" v-if="character.type === 'creature'">
+        Actions:
+        <select
+          v-model="selectAction"
+          id="actionChoiceSelect"
+          @change="chooseAction(targets.indexOf(character))"
+        >
+          <option default disabled selected>-- Select Action --</option>
+          <option v-for="(action, index) in character.actions" :key="index">{{ action.name }}</option>
+        </select>
+      </div>
+
+      <div class="weaponChoice" v-if="character.type === 'creature'">
+        Weapon:
+        <select v-model="selectWeapon" @change="chooseWeapon(selectWeapon)">
+          <option default disabled selected>-- Select Weapon --</option>
+          <option v-for="(weapon, i) of character.weapons" :key="i">{{ weapon.name }}</option>
+        </select>
+      </div>
     </div>
-    <div id="actionChoice" class="actionChoice" v-if="character.characterType === 'pc'">
-      Class Actions:
-      <select
-        v-model="selectClassAction"
-        id="actionChoiceSelect"
-        @change="classAction(targets.indexOf(character))"
-      >
-        <option default disabled selected>-- Select Class Action --</option>
-        <option v-for="(action, index) in character.classActions" :key="index">{{ action.name }}</option>
-      </select>
-    </div>
-    <div id="weaponChoice" class="weaponChoice" v-if="character.type === 'creature'">
-      Weapon:
-      <select v-model="selectWeapon" @change="chooseWeapon(selectWeapon)">
-        <option default disabled selected>-- Select Weapon --</option>
-        <option v-for="(weapon, i) of character.weapons" :key="i">{{ weapon.name }}</option>
-      </select>
-    </div>
+    <div v-else></div>
     <div class="rollButtonContainer">
       <button
         @click="universalCheck(attackValue, defenseValue)"
@@ -137,12 +142,13 @@ export default {
   data() {
     return {
       selectAction: "-- Select Action --",
-      selectClassAction: "-- Select Class Action --",
+      //selectClassAction: "-- Select Class Action --",
       selectTarget: "-- Select Target --",
       selectWeapon: "-- Select Weapon --",
       selectedAction: "",
-      selectedClassAction: "",
-      selectedTarget: {},
+      selectedClassAction: "-- Select Class Action --",
+      selectedTarget: [],
+      weaponType: "",
       selectedWeapon: {},
       charIndex: 0,
       resultMessage: "",
@@ -240,7 +246,6 @@ export default {
     },
     chooseAction(index) {
       if (this.selectAction == "Attack") {
-        console.log("chosen attack for an action");
         document.getElementsByClassName("weaponChoice")[index].style.display =
           "block";
         this.attackValue = this.character.martialProwess;
@@ -280,6 +285,32 @@ export default {
           "none";
         this.attackValue = (this.character.stats.dex - 10) / 2;
         this.defenseValue = this.selectedTarget[0].pPerception;
+      } else if (this.selectAction == "Perception") {
+        document.getElementsByClassName("weaponChoice")[index].style.display =
+          "none";
+        this.attackValue = (this.character.pPerception - 10) / 2;
+        this.defenseValue = 12;
+      } else if (this.selectAction == "Jump") {
+        document.getElementsByClassName("weaponChoice")[index].style.display =
+          "none";
+        this.attackValue = (this.character.stats.dex - 10) / 2;
+        this.defenseValue = 12;
+      } else if (this.selectAction == "Climb") {
+        document.getElementsByClassName("weaponChoice")[index].style.display =
+          "none";
+        this.attackValue =
+          ((this.character.stats.str +
+            this.character.stats.dex +
+            this.character.stats.sta) /
+            3 -
+            10) /
+          2;
+        this.defenseValue = 12;
+      } else if (this.selectAction == "Swim") {
+        document.getElementsByClassName("weaponChoice")[index].style.display =
+          "none";
+        this.attackValue = (this.character.stats.sta - 10) / 2;
+        this.defenseValue = 12;
       } else if (this.selectAction == "Manipulate Mechanism") {
         document.getElementsByClassName("weaponChoice")[index].style.display =
           "none";
@@ -340,6 +371,11 @@ export default {
       }
     },
     classAction(target) {
+      if (this.selectedClassAction === "Melee") {
+        this.weaponType = "Melee";
+      } else if (this.selectedClassAction === "Ranged") {
+        this.weaponType = "Ranged";
+      }
       console.log(
         "the target" + target,
         "the selected class action " + this.selectedClassAction
@@ -375,6 +411,9 @@ export default {
       }
     },
     chooseTarget(subject) {
+      if (subject == "Environment") {
+        this.selectedTarget = { name: "Environment" };
+      }
       this.selectedTarget = this.targets.filter(item => {
         return item.name === subject;
       });

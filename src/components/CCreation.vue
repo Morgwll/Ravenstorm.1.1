@@ -1,5 +1,5 @@
 <template>
-  <div class="mainWrapper">
+  <div class="mainWrapper characterCreation">
     <h2>Character Creation</h2>
     <h3>This is to create the character</h3>
 
@@ -30,6 +30,12 @@
         - Save: {{ Math.floor(stat.value / 2 - 5) }}
       </li>
     </ul>
+    <div>
+      <select id="characterClass" v-model="chosenClass">
+        <option selected disabled>-- Choose Character Class --</option>
+        <option v-for="(cClass, index) in characterClasses" :key="index">{{ cClass }}</option>
+      </select>
+    </div>
     <div>
       Martial Prowess: +
       <div
@@ -82,7 +88,18 @@ export default {
         { name: "Back to Campaign Setup", route: "/game" },
         { name: "Load Game", route: "/loaded" }
       ],
-      level: 1
+      level: 1,
+      characterClasses: [
+        "Hunter",
+        "Sorcerer",
+        "Shaman",
+        "Merchant",
+        "Warrior",
+        "Priest",
+        "Bard",
+        "Rogue"
+      ],
+      chosenClass: "-- Select Class --"
     };
   },
   methods: {
@@ -91,6 +108,9 @@ export default {
       alert("character added");
       let character = {
         portrait: document.getElementById("portrait").value,
+        characterType: "pc",
+        type: "creature",
+        characterClass: document.getElementById("characterClass").value,
         name: document.getElementById("name").value,
         alias: document.getElementById("alias").value,
         age: document.getElementById("age").value,
@@ -109,7 +129,10 @@ export default {
         hitpoints: document.getElementById("hitpoints").innerHTML,
         tempHitpoints: document.getElementById("hitpoints").innerHTML,
         sanity: document.getElementById("sanity").innerHTML,
+        tempSanity: document.getElementById("sanity").innerHTML,
         charisma: document.getElementById("charisma").innerHTML,
+        pPerception: 12,
+        weapons: [],
         actions: [
           { name: "Attack" },
           { name: "Heal" },
@@ -117,7 +140,8 @@ export default {
           { name: "Persuade" },
           { name: "Intimidate" },
           { name: "Pickpocket" }
-        ]
+        ],
+        classActions: []
       };
       if (character.stats.pow > 15) {
         character.actions[6] = { name: "Curse" };
@@ -130,7 +154,9 @@ export default {
         character.actions[13] = { name: "Illusion of Self" };
         console.log(character.actions);
       }
-      this.$store.state.characterList.push(character);
+      console.log(character);
+      this.$store.state.characterList[0].push(character);
+      console.log(this.$store.state.characterList);
     }
   }
 };

@@ -86,6 +86,1771 @@
 /************************************************************************/
 /******/ ({
 
+/***/ "./node_modules/axios/index.js":
+/*!*************************************!*\
+  !*** ./node_modules/axios/index.js ***!
+  \*************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__(/*! ./lib/axios */ "./node_modules/axios/lib/axios.js");
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/adapters/xhr.js":
+/*!************************************************!*\
+  !*** ./node_modules/axios/lib/adapters/xhr.js ***!
+  \************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "./node_modules/axios/lib/utils.js");
+var settle = __webpack_require__(/*! ./../core/settle */ "./node_modules/axios/lib/core/settle.js");
+var buildURL = __webpack_require__(/*! ./../helpers/buildURL */ "./node_modules/axios/lib/helpers/buildURL.js");
+var parseHeaders = __webpack_require__(/*! ./../helpers/parseHeaders */ "./node_modules/axios/lib/helpers/parseHeaders.js");
+var isURLSameOrigin = __webpack_require__(/*! ./../helpers/isURLSameOrigin */ "./node_modules/axios/lib/helpers/isURLSameOrigin.js");
+var createError = __webpack_require__(/*! ../core/createError */ "./node_modules/axios/lib/core/createError.js");
+
+module.exports = function xhrAdapter(config) {
+  return new Promise(function dispatchXhrRequest(resolve, reject) {
+    var requestData = config.data;
+    var requestHeaders = config.headers;
+
+    if (utils.isFormData(requestData)) {
+      delete requestHeaders['Content-Type']; // Let the browser set it
+    }
+
+    var request = new XMLHttpRequest();
+
+    // HTTP basic authentication
+    if (config.auth) {
+      var username = config.auth.username || '';
+      var password = config.auth.password || '';
+      requestHeaders.Authorization = 'Basic ' + btoa(username + ':' + password);
+    }
+
+    request.open(config.method.toUpperCase(), buildURL(config.url, config.params, config.paramsSerializer), true);
+
+    // Set the request timeout in MS
+    request.timeout = config.timeout;
+
+    // Listen for ready state
+    request.onreadystatechange = function handleLoad() {
+      if (!request || request.readyState !== 4) {
+        return;
+      }
+
+      // The request errored out and we didn't get a response, this will be
+      // handled by onerror instead
+      // With one exception: request that using file: protocol, most browsers
+      // will return status as 0 even though it's a successful request
+      if (request.status === 0 && !(request.responseURL && request.responseURL.indexOf('file:') === 0)) {
+        return;
+      }
+
+      // Prepare the response
+      var responseHeaders = 'getAllResponseHeaders' in request ? parseHeaders(request.getAllResponseHeaders()) : null;
+      var responseData = !config.responseType || config.responseType === 'text' ? request.responseText : request.response;
+      var response = {
+        data: responseData,
+        status: request.status,
+        statusText: request.statusText,
+        headers: responseHeaders,
+        config: config,
+        request: request
+      };
+
+      settle(resolve, reject, response);
+
+      // Clean up request
+      request = null;
+    };
+
+    // Handle browser request cancellation (as opposed to a manual cancellation)
+    request.onabort = function handleAbort() {
+      if (!request) {
+        return;
+      }
+
+      reject(createError('Request aborted', config, 'ECONNABORTED', request));
+
+      // Clean up request
+      request = null;
+    };
+
+    // Handle low level network errors
+    request.onerror = function handleError() {
+      // Real errors are hidden from us by the browser
+      // onerror should only fire if it's a network error
+      reject(createError('Network Error', config, null, request));
+
+      // Clean up request
+      request = null;
+    };
+
+    // Handle timeout
+    request.ontimeout = function handleTimeout() {
+      reject(createError('timeout of ' + config.timeout + 'ms exceeded', config, 'ECONNABORTED',
+        request));
+
+      // Clean up request
+      request = null;
+    };
+
+    // Add xsrf header
+    // This is only done if running in a standard browser environment.
+    // Specifically not if we're in a web worker, or react-native.
+    if (utils.isStandardBrowserEnv()) {
+      var cookies = __webpack_require__(/*! ./../helpers/cookies */ "./node_modules/axios/lib/helpers/cookies.js");
+
+      // Add xsrf header
+      var xsrfValue = (config.withCredentials || isURLSameOrigin(config.url)) && config.xsrfCookieName ?
+        cookies.read(config.xsrfCookieName) :
+        undefined;
+
+      if (xsrfValue) {
+        requestHeaders[config.xsrfHeaderName] = xsrfValue;
+      }
+    }
+
+    // Add headers to the request
+    if ('setRequestHeader' in request) {
+      utils.forEach(requestHeaders, function setRequestHeader(val, key) {
+        if (typeof requestData === 'undefined' && key.toLowerCase() === 'content-type') {
+          // Remove Content-Type if data is undefined
+          delete requestHeaders[key];
+        } else {
+          // Otherwise add header to the request
+          request.setRequestHeader(key, val);
+        }
+      });
+    }
+
+    // Add withCredentials to request if needed
+    if (config.withCredentials) {
+      request.withCredentials = true;
+    }
+
+    // Add responseType to request if needed
+    if (config.responseType) {
+      try {
+        request.responseType = config.responseType;
+      } catch (e) {
+        // Expected DOMException thrown by browsers not compatible XMLHttpRequest Level 2.
+        // But, this can be suppressed for 'json' type as it can be parsed by default 'transformResponse' function.
+        if (config.responseType !== 'json') {
+          throw e;
+        }
+      }
+    }
+
+    // Handle progress if needed
+    if (typeof config.onDownloadProgress === 'function') {
+      request.addEventListener('progress', config.onDownloadProgress);
+    }
+
+    // Not all browsers support upload events
+    if (typeof config.onUploadProgress === 'function' && request.upload) {
+      request.upload.addEventListener('progress', config.onUploadProgress);
+    }
+
+    if (config.cancelToken) {
+      // Handle cancellation
+      config.cancelToken.promise.then(function onCanceled(cancel) {
+        if (!request) {
+          return;
+        }
+
+        request.abort();
+        reject(cancel);
+        // Clean up request
+        request = null;
+      });
+    }
+
+    if (requestData === undefined) {
+      requestData = null;
+    }
+
+    // Send the request
+    request.send(requestData);
+  });
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/axios.js":
+/*!*****************************************!*\
+  !*** ./node_modules/axios/lib/axios.js ***!
+  \*****************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./utils */ "./node_modules/axios/lib/utils.js");
+var bind = __webpack_require__(/*! ./helpers/bind */ "./node_modules/axios/lib/helpers/bind.js");
+var Axios = __webpack_require__(/*! ./core/Axios */ "./node_modules/axios/lib/core/Axios.js");
+var mergeConfig = __webpack_require__(/*! ./core/mergeConfig */ "./node_modules/axios/lib/core/mergeConfig.js");
+var defaults = __webpack_require__(/*! ./defaults */ "./node_modules/axios/lib/defaults.js");
+
+/**
+ * Create an instance of Axios
+ *
+ * @param {Object} defaultConfig The default config for the instance
+ * @return {Axios} A new instance of Axios
+ */
+function createInstance(defaultConfig) {
+  var context = new Axios(defaultConfig);
+  var instance = bind(Axios.prototype.request, context);
+
+  // Copy axios.prototype to instance
+  utils.extend(instance, Axios.prototype, context);
+
+  // Copy context to instance
+  utils.extend(instance, context);
+
+  return instance;
+}
+
+// Create the default instance to be exported
+var axios = createInstance(defaults);
+
+// Expose Axios class to allow class inheritance
+axios.Axios = Axios;
+
+// Factory for creating new instances
+axios.create = function create(instanceConfig) {
+  return createInstance(mergeConfig(axios.defaults, instanceConfig));
+};
+
+// Expose Cancel & CancelToken
+axios.Cancel = __webpack_require__(/*! ./cancel/Cancel */ "./node_modules/axios/lib/cancel/Cancel.js");
+axios.CancelToken = __webpack_require__(/*! ./cancel/CancelToken */ "./node_modules/axios/lib/cancel/CancelToken.js");
+axios.isCancel = __webpack_require__(/*! ./cancel/isCancel */ "./node_modules/axios/lib/cancel/isCancel.js");
+
+// Expose all/spread
+axios.all = function all(promises) {
+  return Promise.all(promises);
+};
+axios.spread = __webpack_require__(/*! ./helpers/spread */ "./node_modules/axios/lib/helpers/spread.js");
+
+module.exports = axios;
+
+// Allow use of default import syntax in TypeScript
+module.exports.default = axios;
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/cancel/Cancel.js":
+/*!*************************************************!*\
+  !*** ./node_modules/axios/lib/cancel/Cancel.js ***!
+  \*************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * A `Cancel` is an object that is thrown when an operation is canceled.
+ *
+ * @class
+ * @param {string=} message The message.
+ */
+function Cancel(message) {
+  this.message = message;
+}
+
+Cancel.prototype.toString = function toString() {
+  return 'Cancel' + (this.message ? ': ' + this.message : '');
+};
+
+Cancel.prototype.__CANCEL__ = true;
+
+module.exports = Cancel;
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/cancel/CancelToken.js":
+/*!******************************************************!*\
+  !*** ./node_modules/axios/lib/cancel/CancelToken.js ***!
+  \******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var Cancel = __webpack_require__(/*! ./Cancel */ "./node_modules/axios/lib/cancel/Cancel.js");
+
+/**
+ * A `CancelToken` is an object that can be used to request cancellation of an operation.
+ *
+ * @class
+ * @param {Function} executor The executor function.
+ */
+function CancelToken(executor) {
+  if (typeof executor !== 'function') {
+    throw new TypeError('executor must be a function.');
+  }
+
+  var resolvePromise;
+  this.promise = new Promise(function promiseExecutor(resolve) {
+    resolvePromise = resolve;
+  });
+
+  var token = this;
+  executor(function cancel(message) {
+    if (token.reason) {
+      // Cancellation has already been requested
+      return;
+    }
+
+    token.reason = new Cancel(message);
+    resolvePromise(token.reason);
+  });
+}
+
+/**
+ * Throws a `Cancel` if cancellation has been requested.
+ */
+CancelToken.prototype.throwIfRequested = function throwIfRequested() {
+  if (this.reason) {
+    throw this.reason;
+  }
+};
+
+/**
+ * Returns an object that contains a new `CancelToken` and a function that, when called,
+ * cancels the `CancelToken`.
+ */
+CancelToken.source = function source() {
+  var cancel;
+  var token = new CancelToken(function executor(c) {
+    cancel = c;
+  });
+  return {
+    token: token,
+    cancel: cancel
+  };
+};
+
+module.exports = CancelToken;
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/cancel/isCancel.js":
+/*!***************************************************!*\
+  !*** ./node_modules/axios/lib/cancel/isCancel.js ***!
+  \***************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = function isCancel(value) {
+  return !!(value && value.__CANCEL__);
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/core/Axios.js":
+/*!**********************************************!*\
+  !*** ./node_modules/axios/lib/core/Axios.js ***!
+  \**********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "./node_modules/axios/lib/utils.js");
+var buildURL = __webpack_require__(/*! ../helpers/buildURL */ "./node_modules/axios/lib/helpers/buildURL.js");
+var InterceptorManager = __webpack_require__(/*! ./InterceptorManager */ "./node_modules/axios/lib/core/InterceptorManager.js");
+var dispatchRequest = __webpack_require__(/*! ./dispatchRequest */ "./node_modules/axios/lib/core/dispatchRequest.js");
+var mergeConfig = __webpack_require__(/*! ./mergeConfig */ "./node_modules/axios/lib/core/mergeConfig.js");
+
+/**
+ * Create a new instance of Axios
+ *
+ * @param {Object} instanceConfig The default config for the instance
+ */
+function Axios(instanceConfig) {
+  this.defaults = instanceConfig;
+  this.interceptors = {
+    request: new InterceptorManager(),
+    response: new InterceptorManager()
+  };
+}
+
+/**
+ * Dispatch a request
+ *
+ * @param {Object} config The config specific for this request (merged with this.defaults)
+ */
+Axios.prototype.request = function request(config) {
+  /*eslint no-param-reassign:0*/
+  // Allow for axios('example/url'[, config]) a la fetch API
+  if (typeof config === 'string') {
+    config = arguments[1] || {};
+    config.url = arguments[0];
+  } else {
+    config = config || {};
+  }
+
+  config = mergeConfig(this.defaults, config);
+  config.method = config.method ? config.method.toLowerCase() : 'get';
+
+  // Hook up interceptors middleware
+  var chain = [dispatchRequest, undefined];
+  var promise = Promise.resolve(config);
+
+  this.interceptors.request.forEach(function unshiftRequestInterceptors(interceptor) {
+    chain.unshift(interceptor.fulfilled, interceptor.rejected);
+  });
+
+  this.interceptors.response.forEach(function pushResponseInterceptors(interceptor) {
+    chain.push(interceptor.fulfilled, interceptor.rejected);
+  });
+
+  while (chain.length) {
+    promise = promise.then(chain.shift(), chain.shift());
+  }
+
+  return promise;
+};
+
+Axios.prototype.getUri = function getUri(config) {
+  config = mergeConfig(this.defaults, config);
+  return buildURL(config.url, config.params, config.paramsSerializer).replace(/^\?/, '');
+};
+
+// Provide aliases for supported request methods
+utils.forEach(['delete', 'get', 'head', 'options'], function forEachMethodNoData(method) {
+  /*eslint func-names:0*/
+  Axios.prototype[method] = function(url, config) {
+    return this.request(utils.merge(config || {}, {
+      method: method,
+      url: url
+    }));
+  };
+});
+
+utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
+  /*eslint func-names:0*/
+  Axios.prototype[method] = function(url, data, config) {
+    return this.request(utils.merge(config || {}, {
+      method: method,
+      url: url,
+      data: data
+    }));
+  };
+});
+
+module.exports = Axios;
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/core/InterceptorManager.js":
+/*!***********************************************************!*\
+  !*** ./node_modules/axios/lib/core/InterceptorManager.js ***!
+  \***********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "./node_modules/axios/lib/utils.js");
+
+function InterceptorManager() {
+  this.handlers = [];
+}
+
+/**
+ * Add a new interceptor to the stack
+ *
+ * @param {Function} fulfilled The function to handle `then` for a `Promise`
+ * @param {Function} rejected The function to handle `reject` for a `Promise`
+ *
+ * @return {Number} An ID used to remove interceptor later
+ */
+InterceptorManager.prototype.use = function use(fulfilled, rejected) {
+  this.handlers.push({
+    fulfilled: fulfilled,
+    rejected: rejected
+  });
+  return this.handlers.length - 1;
+};
+
+/**
+ * Remove an interceptor from the stack
+ *
+ * @param {Number} id The ID that was returned by `use`
+ */
+InterceptorManager.prototype.eject = function eject(id) {
+  if (this.handlers[id]) {
+    this.handlers[id] = null;
+  }
+};
+
+/**
+ * Iterate over all the registered interceptors
+ *
+ * This method is particularly useful for skipping over any
+ * interceptors that may have become `null` calling `eject`.
+ *
+ * @param {Function} fn The function to call for each interceptor
+ */
+InterceptorManager.prototype.forEach = function forEach(fn) {
+  utils.forEach(this.handlers, function forEachHandler(h) {
+    if (h !== null) {
+      fn(h);
+    }
+  });
+};
+
+module.exports = InterceptorManager;
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/core/createError.js":
+/*!****************************************************!*\
+  !*** ./node_modules/axios/lib/core/createError.js ***!
+  \****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var enhanceError = __webpack_require__(/*! ./enhanceError */ "./node_modules/axios/lib/core/enhanceError.js");
+
+/**
+ * Create an Error with the specified message, config, error code, request and response.
+ *
+ * @param {string} message The error message.
+ * @param {Object} config The config.
+ * @param {string} [code] The error code (for example, 'ECONNABORTED').
+ * @param {Object} [request] The request.
+ * @param {Object} [response] The response.
+ * @returns {Error} The created error.
+ */
+module.exports = function createError(message, config, code, request, response) {
+  var error = new Error(message);
+  return enhanceError(error, config, code, request, response);
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/core/dispatchRequest.js":
+/*!********************************************************!*\
+  !*** ./node_modules/axios/lib/core/dispatchRequest.js ***!
+  \********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "./node_modules/axios/lib/utils.js");
+var transformData = __webpack_require__(/*! ./transformData */ "./node_modules/axios/lib/core/transformData.js");
+var isCancel = __webpack_require__(/*! ../cancel/isCancel */ "./node_modules/axios/lib/cancel/isCancel.js");
+var defaults = __webpack_require__(/*! ../defaults */ "./node_modules/axios/lib/defaults.js");
+var isAbsoluteURL = __webpack_require__(/*! ./../helpers/isAbsoluteURL */ "./node_modules/axios/lib/helpers/isAbsoluteURL.js");
+var combineURLs = __webpack_require__(/*! ./../helpers/combineURLs */ "./node_modules/axios/lib/helpers/combineURLs.js");
+
+/**
+ * Throws a `Cancel` if cancellation has been requested.
+ */
+function throwIfCancellationRequested(config) {
+  if (config.cancelToken) {
+    config.cancelToken.throwIfRequested();
+  }
+}
+
+/**
+ * Dispatch a request to the server using the configured adapter.
+ *
+ * @param {object} config The config that is to be used for the request
+ * @returns {Promise} The Promise to be fulfilled
+ */
+module.exports = function dispatchRequest(config) {
+  throwIfCancellationRequested(config);
+
+  // Support baseURL config
+  if (config.baseURL && !isAbsoluteURL(config.url)) {
+    config.url = combineURLs(config.baseURL, config.url);
+  }
+
+  // Ensure headers exist
+  config.headers = config.headers || {};
+
+  // Transform request data
+  config.data = transformData(
+    config.data,
+    config.headers,
+    config.transformRequest
+  );
+
+  // Flatten headers
+  config.headers = utils.merge(
+    config.headers.common || {},
+    config.headers[config.method] || {},
+    config.headers || {}
+  );
+
+  utils.forEach(
+    ['delete', 'get', 'head', 'post', 'put', 'patch', 'common'],
+    function cleanHeaderConfig(method) {
+      delete config.headers[method];
+    }
+  );
+
+  var adapter = config.adapter || defaults.adapter;
+
+  return adapter(config).then(function onAdapterResolution(response) {
+    throwIfCancellationRequested(config);
+
+    // Transform response data
+    response.data = transformData(
+      response.data,
+      response.headers,
+      config.transformResponse
+    );
+
+    return response;
+  }, function onAdapterRejection(reason) {
+    if (!isCancel(reason)) {
+      throwIfCancellationRequested(config);
+
+      // Transform response data
+      if (reason && reason.response) {
+        reason.response.data = transformData(
+          reason.response.data,
+          reason.response.headers,
+          config.transformResponse
+        );
+      }
+    }
+
+    return Promise.reject(reason);
+  });
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/core/enhanceError.js":
+/*!*****************************************************!*\
+  !*** ./node_modules/axios/lib/core/enhanceError.js ***!
+  \*****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Update an Error with the specified config, error code, and response.
+ *
+ * @param {Error} error The error to update.
+ * @param {Object} config The config.
+ * @param {string} [code] The error code (for example, 'ECONNABORTED').
+ * @param {Object} [request] The request.
+ * @param {Object} [response] The response.
+ * @returns {Error} The error.
+ */
+module.exports = function enhanceError(error, config, code, request, response) {
+  error.config = config;
+  if (code) {
+    error.code = code;
+  }
+
+  error.request = request;
+  error.response = response;
+  error.isAxiosError = true;
+
+  error.toJSON = function() {
+    return {
+      // Standard
+      message: this.message,
+      name: this.name,
+      // Microsoft
+      description: this.description,
+      number: this.number,
+      // Mozilla
+      fileName: this.fileName,
+      lineNumber: this.lineNumber,
+      columnNumber: this.columnNumber,
+      stack: this.stack,
+      // Axios
+      config: this.config,
+      code: this.code
+    };
+  };
+  return error;
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/core/mergeConfig.js":
+/*!****************************************************!*\
+  !*** ./node_modules/axios/lib/core/mergeConfig.js ***!
+  \****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ../utils */ "./node_modules/axios/lib/utils.js");
+
+/**
+ * Config-specific merge-function which creates a new config-object
+ * by merging two configuration objects together.
+ *
+ * @param {Object} config1
+ * @param {Object} config2
+ * @returns {Object} New object resulting from merging config2 to config1
+ */
+module.exports = function mergeConfig(config1, config2) {
+  // eslint-disable-next-line no-param-reassign
+  config2 = config2 || {};
+  var config = {};
+
+  utils.forEach(['url', 'method', 'params', 'data'], function valueFromConfig2(prop) {
+    if (typeof config2[prop] !== 'undefined') {
+      config[prop] = config2[prop];
+    }
+  });
+
+  utils.forEach(['headers', 'auth', 'proxy'], function mergeDeepProperties(prop) {
+    if (utils.isObject(config2[prop])) {
+      config[prop] = utils.deepMerge(config1[prop], config2[prop]);
+    } else if (typeof config2[prop] !== 'undefined') {
+      config[prop] = config2[prop];
+    } else if (utils.isObject(config1[prop])) {
+      config[prop] = utils.deepMerge(config1[prop]);
+    } else if (typeof config1[prop] !== 'undefined') {
+      config[prop] = config1[prop];
+    }
+  });
+
+  utils.forEach([
+    'baseURL', 'transformRequest', 'transformResponse', 'paramsSerializer',
+    'timeout', 'withCredentials', 'adapter', 'responseType', 'xsrfCookieName',
+    'xsrfHeaderName', 'onUploadProgress', 'onDownloadProgress', 'maxContentLength',
+    'validateStatus', 'maxRedirects', 'httpAgent', 'httpsAgent', 'cancelToken',
+    'socketPath'
+  ], function defaultToConfig2(prop) {
+    if (typeof config2[prop] !== 'undefined') {
+      config[prop] = config2[prop];
+    } else if (typeof config1[prop] !== 'undefined') {
+      config[prop] = config1[prop];
+    }
+  });
+
+  return config;
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/core/settle.js":
+/*!***********************************************!*\
+  !*** ./node_modules/axios/lib/core/settle.js ***!
+  \***********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var createError = __webpack_require__(/*! ./createError */ "./node_modules/axios/lib/core/createError.js");
+
+/**
+ * Resolve or reject a Promise based on response status.
+ *
+ * @param {Function} resolve A function that resolves the promise.
+ * @param {Function} reject A function that rejects the promise.
+ * @param {object} response The response.
+ */
+module.exports = function settle(resolve, reject, response) {
+  var validateStatus = response.config.validateStatus;
+  if (!validateStatus || validateStatus(response.status)) {
+    resolve(response);
+  } else {
+    reject(createError(
+      'Request failed with status code ' + response.status,
+      response.config,
+      null,
+      response.request,
+      response
+    ));
+  }
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/core/transformData.js":
+/*!******************************************************!*\
+  !*** ./node_modules/axios/lib/core/transformData.js ***!
+  \******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "./node_modules/axios/lib/utils.js");
+
+/**
+ * Transform the data for a request or a response
+ *
+ * @param {Object|String} data The data to be transformed
+ * @param {Array} headers The headers for the request or response
+ * @param {Array|Function} fns A single function or Array of functions
+ * @returns {*} The resulting transformed data
+ */
+module.exports = function transformData(data, headers, fns) {
+  /*eslint no-param-reassign:0*/
+  utils.forEach(fns, function transform(fn) {
+    data = fn(data, headers);
+  });
+
+  return data;
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/defaults.js":
+/*!********************************************!*\
+  !*** ./node_modules/axios/lib/defaults.js ***!
+  \********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(process) {
+
+var utils = __webpack_require__(/*! ./utils */ "./node_modules/axios/lib/utils.js");
+var normalizeHeaderName = __webpack_require__(/*! ./helpers/normalizeHeaderName */ "./node_modules/axios/lib/helpers/normalizeHeaderName.js");
+
+var DEFAULT_CONTENT_TYPE = {
+  'Content-Type': 'application/x-www-form-urlencoded'
+};
+
+function setContentTypeIfUnset(headers, value) {
+  if (!utils.isUndefined(headers) && utils.isUndefined(headers['Content-Type'])) {
+    headers['Content-Type'] = value;
+  }
+}
+
+function getDefaultAdapter() {
+  var adapter;
+  // Only Node.JS has a process variable that is of [[Class]] process
+  if (typeof process !== 'undefined' && Object.prototype.toString.call(process) === '[object process]') {
+    // For node use HTTP adapter
+    adapter = __webpack_require__(/*! ./adapters/http */ "./node_modules/axios/lib/adapters/xhr.js");
+  } else if (typeof XMLHttpRequest !== 'undefined') {
+    // For browsers use XHR adapter
+    adapter = __webpack_require__(/*! ./adapters/xhr */ "./node_modules/axios/lib/adapters/xhr.js");
+  }
+  return adapter;
+}
+
+var defaults = {
+  adapter: getDefaultAdapter(),
+
+  transformRequest: [function transformRequest(data, headers) {
+    normalizeHeaderName(headers, 'Accept');
+    normalizeHeaderName(headers, 'Content-Type');
+    if (utils.isFormData(data) ||
+      utils.isArrayBuffer(data) ||
+      utils.isBuffer(data) ||
+      utils.isStream(data) ||
+      utils.isFile(data) ||
+      utils.isBlob(data)
+    ) {
+      return data;
+    }
+    if (utils.isArrayBufferView(data)) {
+      return data.buffer;
+    }
+    if (utils.isURLSearchParams(data)) {
+      setContentTypeIfUnset(headers, 'application/x-www-form-urlencoded;charset=utf-8');
+      return data.toString();
+    }
+    if (utils.isObject(data)) {
+      setContentTypeIfUnset(headers, 'application/json;charset=utf-8');
+      return JSON.stringify(data);
+    }
+    return data;
+  }],
+
+  transformResponse: [function transformResponse(data) {
+    /*eslint no-param-reassign:0*/
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch (e) { /* Ignore */ }
+    }
+    return data;
+  }],
+
+  /**
+   * A timeout in milliseconds to abort a request. If set to 0 (default) a
+   * timeout is not created.
+   */
+  timeout: 0,
+
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
+
+  maxContentLength: -1,
+
+  validateStatus: function validateStatus(status) {
+    return status >= 200 && status < 300;
+  }
+};
+
+defaults.headers = {
+  common: {
+    'Accept': 'application/json, text/plain, */*'
+  }
+};
+
+utils.forEach(['delete', 'get', 'head'], function forEachMethodNoData(method) {
+  defaults.headers[method] = {};
+});
+
+utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
+  defaults.headers[method] = utils.merge(DEFAULT_CONTENT_TYPE);
+});
+
+module.exports = defaults;
+
+/* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(/*! ./../../process/browser.js */ "./node_modules/process/browser.js")))
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/helpers/bind.js":
+/*!************************************************!*\
+  !*** ./node_modules/axios/lib/helpers/bind.js ***!
+  \************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = function bind(fn, thisArg) {
+  return function wrap() {
+    var args = new Array(arguments.length);
+    for (var i = 0; i < args.length; i++) {
+      args[i] = arguments[i];
+    }
+    return fn.apply(thisArg, args);
+  };
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/helpers/buildURL.js":
+/*!****************************************************!*\
+  !*** ./node_modules/axios/lib/helpers/buildURL.js ***!
+  \****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "./node_modules/axios/lib/utils.js");
+
+function encode(val) {
+  return encodeURIComponent(val).
+    replace(/%40/gi, '@').
+    replace(/%3A/gi, ':').
+    replace(/%24/g, '$').
+    replace(/%2C/gi, ',').
+    replace(/%20/g, '+').
+    replace(/%5B/gi, '[').
+    replace(/%5D/gi, ']');
+}
+
+/**
+ * Build a URL by appending params to the end
+ *
+ * @param {string} url The base of the url (e.g., http://www.google.com)
+ * @param {object} [params] The params to be appended
+ * @returns {string} The formatted url
+ */
+module.exports = function buildURL(url, params, paramsSerializer) {
+  /*eslint no-param-reassign:0*/
+  if (!params) {
+    return url;
+  }
+
+  var serializedParams;
+  if (paramsSerializer) {
+    serializedParams = paramsSerializer(params);
+  } else if (utils.isURLSearchParams(params)) {
+    serializedParams = params.toString();
+  } else {
+    var parts = [];
+
+    utils.forEach(params, function serialize(val, key) {
+      if (val === null || typeof val === 'undefined') {
+        return;
+      }
+
+      if (utils.isArray(val)) {
+        key = key + '[]';
+      } else {
+        val = [val];
+      }
+
+      utils.forEach(val, function parseValue(v) {
+        if (utils.isDate(v)) {
+          v = v.toISOString();
+        } else if (utils.isObject(v)) {
+          v = JSON.stringify(v);
+        }
+        parts.push(encode(key) + '=' + encode(v));
+      });
+    });
+
+    serializedParams = parts.join('&');
+  }
+
+  if (serializedParams) {
+    var hashmarkIndex = url.indexOf('#');
+    if (hashmarkIndex !== -1) {
+      url = url.slice(0, hashmarkIndex);
+    }
+
+    url += (url.indexOf('?') === -1 ? '?' : '&') + serializedParams;
+  }
+
+  return url;
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/helpers/combineURLs.js":
+/*!*******************************************************!*\
+  !*** ./node_modules/axios/lib/helpers/combineURLs.js ***!
+  \*******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Creates a new URL by combining the specified URLs
+ *
+ * @param {string} baseURL The base URL
+ * @param {string} relativeURL The relative URL
+ * @returns {string} The combined URL
+ */
+module.exports = function combineURLs(baseURL, relativeURL) {
+  return relativeURL
+    ? baseURL.replace(/\/+$/, '') + '/' + relativeURL.replace(/^\/+/, '')
+    : baseURL;
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/helpers/cookies.js":
+/*!***************************************************!*\
+  !*** ./node_modules/axios/lib/helpers/cookies.js ***!
+  \***************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "./node_modules/axios/lib/utils.js");
+
+module.exports = (
+  utils.isStandardBrowserEnv() ?
+
+  // Standard browser envs support document.cookie
+    (function standardBrowserEnv() {
+      return {
+        write: function write(name, value, expires, path, domain, secure) {
+          var cookie = [];
+          cookie.push(name + '=' + encodeURIComponent(value));
+
+          if (utils.isNumber(expires)) {
+            cookie.push('expires=' + new Date(expires).toGMTString());
+          }
+
+          if (utils.isString(path)) {
+            cookie.push('path=' + path);
+          }
+
+          if (utils.isString(domain)) {
+            cookie.push('domain=' + domain);
+          }
+
+          if (secure === true) {
+            cookie.push('secure');
+          }
+
+          document.cookie = cookie.join('; ');
+        },
+
+        read: function read(name) {
+          var match = document.cookie.match(new RegExp('(^|;\\s*)(' + name + ')=([^;]*)'));
+          return (match ? decodeURIComponent(match[3]) : null);
+        },
+
+        remove: function remove(name) {
+          this.write(name, '', Date.now() - 86400000);
+        }
+      };
+    })() :
+
+  // Non standard browser env (web workers, react-native) lack needed support.
+    (function nonStandardBrowserEnv() {
+      return {
+        write: function write() {},
+        read: function read() { return null; },
+        remove: function remove() {}
+      };
+    })()
+);
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/helpers/isAbsoluteURL.js":
+/*!*********************************************************!*\
+  !*** ./node_modules/axios/lib/helpers/isAbsoluteURL.js ***!
+  \*********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Determines whether the specified URL is absolute
+ *
+ * @param {string} url The URL to test
+ * @returns {boolean} True if the specified URL is absolute, otherwise false
+ */
+module.exports = function isAbsoluteURL(url) {
+  // A URL is considered absolute if it begins with "<scheme>://" or "//" (protocol-relative URL).
+  // RFC 3986 defines scheme name as a sequence of characters beginning with a letter and followed
+  // by any combination of letters, digits, plus, period, or hyphen.
+  return /^([a-z][a-z\d\+\-\.]*:)?\/\//i.test(url);
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/helpers/isURLSameOrigin.js":
+/*!***********************************************************!*\
+  !*** ./node_modules/axios/lib/helpers/isURLSameOrigin.js ***!
+  \***********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "./node_modules/axios/lib/utils.js");
+
+module.exports = (
+  utils.isStandardBrowserEnv() ?
+
+  // Standard browser envs have full support of the APIs needed to test
+  // whether the request URL is of the same origin as current location.
+    (function standardBrowserEnv() {
+      var msie = /(msie|trident)/i.test(navigator.userAgent);
+      var urlParsingNode = document.createElement('a');
+      var originURL;
+
+      /**
+    * Parse a URL to discover it's components
+    *
+    * @param {String} url The URL to be parsed
+    * @returns {Object}
+    */
+      function resolveURL(url) {
+        var href = url;
+
+        if (msie) {
+        // IE needs attribute set twice to normalize properties
+          urlParsingNode.setAttribute('href', href);
+          href = urlParsingNode.href;
+        }
+
+        urlParsingNode.setAttribute('href', href);
+
+        // urlParsingNode provides the UrlUtils interface - http://url.spec.whatwg.org/#urlutils
+        return {
+          href: urlParsingNode.href,
+          protocol: urlParsingNode.protocol ? urlParsingNode.protocol.replace(/:$/, '') : '',
+          host: urlParsingNode.host,
+          search: urlParsingNode.search ? urlParsingNode.search.replace(/^\?/, '') : '',
+          hash: urlParsingNode.hash ? urlParsingNode.hash.replace(/^#/, '') : '',
+          hostname: urlParsingNode.hostname,
+          port: urlParsingNode.port,
+          pathname: (urlParsingNode.pathname.charAt(0) === '/') ?
+            urlParsingNode.pathname :
+            '/' + urlParsingNode.pathname
+        };
+      }
+
+      originURL = resolveURL(window.location.href);
+
+      /**
+    * Determine if a URL shares the same origin as the current location
+    *
+    * @param {String} requestURL The URL to test
+    * @returns {boolean} True if URL shares the same origin, otherwise false
+    */
+      return function isURLSameOrigin(requestURL) {
+        var parsed = (utils.isString(requestURL)) ? resolveURL(requestURL) : requestURL;
+        return (parsed.protocol === originURL.protocol &&
+            parsed.host === originURL.host);
+      };
+    })() :
+
+  // Non standard browser envs (web workers, react-native) lack needed support.
+    (function nonStandardBrowserEnv() {
+      return function isURLSameOrigin() {
+        return true;
+      };
+    })()
+);
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/helpers/normalizeHeaderName.js":
+/*!***************************************************************!*\
+  !*** ./node_modules/axios/lib/helpers/normalizeHeaderName.js ***!
+  \***************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ../utils */ "./node_modules/axios/lib/utils.js");
+
+module.exports = function normalizeHeaderName(headers, normalizedName) {
+  utils.forEach(headers, function processHeader(value, name) {
+    if (name !== normalizedName && name.toUpperCase() === normalizedName.toUpperCase()) {
+      headers[normalizedName] = value;
+      delete headers[name];
+    }
+  });
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/helpers/parseHeaders.js":
+/*!********************************************************!*\
+  !*** ./node_modules/axios/lib/helpers/parseHeaders.js ***!
+  \********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "./node_modules/axios/lib/utils.js");
+
+// Headers whose duplicates are ignored by node
+// c.f. https://nodejs.org/api/http.html#http_message_headers
+var ignoreDuplicateOf = [
+  'age', 'authorization', 'content-length', 'content-type', 'etag',
+  'expires', 'from', 'host', 'if-modified-since', 'if-unmodified-since',
+  'last-modified', 'location', 'max-forwards', 'proxy-authorization',
+  'referer', 'retry-after', 'user-agent'
+];
+
+/**
+ * Parse headers into an object
+ *
+ * ```
+ * Date: Wed, 27 Aug 2014 08:58:49 GMT
+ * Content-Type: application/json
+ * Connection: keep-alive
+ * Transfer-Encoding: chunked
+ * ```
+ *
+ * @param {String} headers Headers needing to be parsed
+ * @returns {Object} Headers parsed into an object
+ */
+module.exports = function parseHeaders(headers) {
+  var parsed = {};
+  var key;
+  var val;
+  var i;
+
+  if (!headers) { return parsed; }
+
+  utils.forEach(headers.split('\n'), function parser(line) {
+    i = line.indexOf(':');
+    key = utils.trim(line.substr(0, i)).toLowerCase();
+    val = utils.trim(line.substr(i + 1));
+
+    if (key) {
+      if (parsed[key] && ignoreDuplicateOf.indexOf(key) >= 0) {
+        return;
+      }
+      if (key === 'set-cookie') {
+        parsed[key] = (parsed[key] ? parsed[key] : []).concat([val]);
+      } else {
+        parsed[key] = parsed[key] ? parsed[key] + ', ' + val : val;
+      }
+    }
+  });
+
+  return parsed;
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/helpers/spread.js":
+/*!**************************************************!*\
+  !*** ./node_modules/axios/lib/helpers/spread.js ***!
+  \**************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Syntactic sugar for invoking a function and expanding an array for arguments.
+ *
+ * Common use case would be to use `Function.prototype.apply`.
+ *
+ *  ```js
+ *  function f(x, y, z) {}
+ *  var args = [1, 2, 3];
+ *  f.apply(null, args);
+ *  ```
+ *
+ * With `spread` this example can be re-written.
+ *
+ *  ```js
+ *  spread(function(x, y, z) {})([1, 2, 3]);
+ *  ```
+ *
+ * @param {Function} callback
+ * @returns {Function}
+ */
+module.exports = function spread(callback) {
+  return function wrap(arr) {
+    return callback.apply(null, arr);
+  };
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/utils.js":
+/*!*****************************************!*\
+  !*** ./node_modules/axios/lib/utils.js ***!
+  \*****************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var bind = __webpack_require__(/*! ./helpers/bind */ "./node_modules/axios/lib/helpers/bind.js");
+var isBuffer = __webpack_require__(/*! is-buffer */ "./node_modules/axios/node_modules/is-buffer/index.js");
+
+/*global toString:true*/
+
+// utils is a library of generic helper functions non-specific to axios
+
+var toString = Object.prototype.toString;
+
+/**
+ * Determine if a value is an Array
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an Array, otherwise false
+ */
+function isArray(val) {
+  return toString.call(val) === '[object Array]';
+}
+
+/**
+ * Determine if a value is an ArrayBuffer
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an ArrayBuffer, otherwise false
+ */
+function isArrayBuffer(val) {
+  return toString.call(val) === '[object ArrayBuffer]';
+}
+
+/**
+ * Determine if a value is a FormData
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an FormData, otherwise false
+ */
+function isFormData(val) {
+  return (typeof FormData !== 'undefined') && (val instanceof FormData);
+}
+
+/**
+ * Determine if a value is a view on an ArrayBuffer
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a view on an ArrayBuffer, otherwise false
+ */
+function isArrayBufferView(val) {
+  var result;
+  if ((typeof ArrayBuffer !== 'undefined') && (ArrayBuffer.isView)) {
+    result = ArrayBuffer.isView(val);
+  } else {
+    result = (val) && (val.buffer) && (val.buffer instanceof ArrayBuffer);
+  }
+  return result;
+}
+
+/**
+ * Determine if a value is a String
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a String, otherwise false
+ */
+function isString(val) {
+  return typeof val === 'string';
+}
+
+/**
+ * Determine if a value is a Number
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Number, otherwise false
+ */
+function isNumber(val) {
+  return typeof val === 'number';
+}
+
+/**
+ * Determine if a value is undefined
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if the value is undefined, otherwise false
+ */
+function isUndefined(val) {
+  return typeof val === 'undefined';
+}
+
+/**
+ * Determine if a value is an Object
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an Object, otherwise false
+ */
+function isObject(val) {
+  return val !== null && typeof val === 'object';
+}
+
+/**
+ * Determine if a value is a Date
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Date, otherwise false
+ */
+function isDate(val) {
+  return toString.call(val) === '[object Date]';
+}
+
+/**
+ * Determine if a value is a File
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a File, otherwise false
+ */
+function isFile(val) {
+  return toString.call(val) === '[object File]';
+}
+
+/**
+ * Determine if a value is a Blob
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Blob, otherwise false
+ */
+function isBlob(val) {
+  return toString.call(val) === '[object Blob]';
+}
+
+/**
+ * Determine if a value is a Function
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Function, otherwise false
+ */
+function isFunction(val) {
+  return toString.call(val) === '[object Function]';
+}
+
+/**
+ * Determine if a value is a Stream
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Stream, otherwise false
+ */
+function isStream(val) {
+  return isObject(val) && isFunction(val.pipe);
+}
+
+/**
+ * Determine if a value is a URLSearchParams object
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a URLSearchParams object, otherwise false
+ */
+function isURLSearchParams(val) {
+  return typeof URLSearchParams !== 'undefined' && val instanceof URLSearchParams;
+}
+
+/**
+ * Trim excess whitespace off the beginning and end of a string
+ *
+ * @param {String} str The String to trim
+ * @returns {String} The String freed of excess whitespace
+ */
+function trim(str) {
+  return str.replace(/^\s*/, '').replace(/\s*$/, '');
+}
+
+/**
+ * Determine if we're running in a standard browser environment
+ *
+ * This allows axios to run in a web worker, and react-native.
+ * Both environments support XMLHttpRequest, but not fully standard globals.
+ *
+ * web workers:
+ *  typeof window -> undefined
+ *  typeof document -> undefined
+ *
+ * react-native:
+ *  navigator.product -> 'ReactNative'
+ * nativescript
+ *  navigator.product -> 'NativeScript' or 'NS'
+ */
+function isStandardBrowserEnv() {
+  if (typeof navigator !== 'undefined' && (navigator.product === 'ReactNative' ||
+                                           navigator.product === 'NativeScript' ||
+                                           navigator.product === 'NS')) {
+    return false;
+  }
+  return (
+    typeof window !== 'undefined' &&
+    typeof document !== 'undefined'
+  );
+}
+
+/**
+ * Iterate over an Array or an Object invoking a function for each item.
+ *
+ * If `obj` is an Array callback will be called passing
+ * the value, index, and complete array for each item.
+ *
+ * If 'obj' is an Object callback will be called passing
+ * the value, key, and complete object for each property.
+ *
+ * @param {Object|Array} obj The object to iterate
+ * @param {Function} fn The callback to invoke for each item
+ */
+function forEach(obj, fn) {
+  // Don't bother if no value provided
+  if (obj === null || typeof obj === 'undefined') {
+    return;
+  }
+
+  // Force an array if not already something iterable
+  if (typeof obj !== 'object') {
+    /*eslint no-param-reassign:0*/
+    obj = [obj];
+  }
+
+  if (isArray(obj)) {
+    // Iterate over array values
+    for (var i = 0, l = obj.length; i < l; i++) {
+      fn.call(null, obj[i], i, obj);
+    }
+  } else {
+    // Iterate over object keys
+    for (var key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        fn.call(null, obj[key], key, obj);
+      }
+    }
+  }
+}
+
+/**
+ * Accepts varargs expecting each argument to be an object, then
+ * immutably merges the properties of each object and returns result.
+ *
+ * When multiple objects contain the same key the later object in
+ * the arguments list will take precedence.
+ *
+ * Example:
+ *
+ * ```js
+ * var result = merge({foo: 123}, {foo: 456});
+ * console.log(result.foo); // outputs 456
+ * ```
+ *
+ * @param {Object} obj1 Object to merge
+ * @returns {Object} Result of all merge properties
+ */
+function merge(/* obj1, obj2, obj3, ... */) {
+  var result = {};
+  function assignValue(val, key) {
+    if (typeof result[key] === 'object' && typeof val === 'object') {
+      result[key] = merge(result[key], val);
+    } else {
+      result[key] = val;
+    }
+  }
+
+  for (var i = 0, l = arguments.length; i < l; i++) {
+    forEach(arguments[i], assignValue);
+  }
+  return result;
+}
+
+/**
+ * Function equal to merge with the difference being that no reference
+ * to original objects is kept.
+ *
+ * @see merge
+ * @param {Object} obj1 Object to merge
+ * @returns {Object} Result of all merge properties
+ */
+function deepMerge(/* obj1, obj2, obj3, ... */) {
+  var result = {};
+  function assignValue(val, key) {
+    if (typeof result[key] === 'object' && typeof val === 'object') {
+      result[key] = deepMerge(result[key], val);
+    } else if (typeof val === 'object') {
+      result[key] = deepMerge({}, val);
+    } else {
+      result[key] = val;
+    }
+  }
+
+  for (var i = 0, l = arguments.length; i < l; i++) {
+    forEach(arguments[i], assignValue);
+  }
+  return result;
+}
+
+/**
+ * Extends object a by mutably adding to it the properties of object b.
+ *
+ * @param {Object} a The object to be extended
+ * @param {Object} b The object to copy properties from
+ * @param {Object} thisArg The object to bind function to
+ * @return {Object} The resulting value of object a
+ */
+function extend(a, b, thisArg) {
+  forEach(b, function assignValue(val, key) {
+    if (thisArg && typeof val === 'function') {
+      a[key] = bind(val, thisArg);
+    } else {
+      a[key] = val;
+    }
+  });
+  return a;
+}
+
+module.exports = {
+  isArray: isArray,
+  isArrayBuffer: isArrayBuffer,
+  isBuffer: isBuffer,
+  isFormData: isFormData,
+  isArrayBufferView: isArrayBufferView,
+  isString: isString,
+  isNumber: isNumber,
+  isObject: isObject,
+  isUndefined: isUndefined,
+  isDate: isDate,
+  isFile: isFile,
+  isBlob: isBlob,
+  isFunction: isFunction,
+  isStream: isStream,
+  isURLSearchParams: isURLSearchParams,
+  isStandardBrowserEnv: isStandardBrowserEnv,
+  forEach: forEach,
+  merge: merge,
+  deepMerge: deepMerge,
+  extend: extend,
+  trim: trim
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/node_modules/is-buffer/index.js":
+/*!************************************************************!*\
+  !*** ./node_modules/axios/node_modules/is-buffer/index.js ***!
+  \************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+/*!
+ * Determine if an object is a Buffer
+ *
+ * @author   Feross Aboukhadijeh <https://feross.org>
+ * @license  MIT
+ */
+
+module.exports = function isBuffer (obj) {
+  return obj != null && obj.constructor != null &&
+    typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
+}
+
+
+/***/ }),
+
 /***/ "./node_modules/babel-loader/lib/index.js!./node_modules/vue-loader/lib/index.js?!./src/App.vue?vue&type=script&lang=js&":
 /*!********************************************************************************************************************************!*\
   !*** ./node_modules/babel-loader/lib!./node_modules/vue-loader/lib??vue-loader-options!./src/App.vue?vue&type=script&lang=js& ***!
@@ -97,6 +1862,7 @@
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _components_menus_MainMenu_vue__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./components/menus/MainMenu.vue */ "./src/components/menus/MainMenu.vue");
 /* harmony import */ var _components_SigninLogin_vue__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./components/SigninLogin.vue */ "./src/components/SigninLogin.vue");
+/* harmony import */ var _components_Footer_vue__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./components/Footer.vue */ "./src/components/Footer.vue");
 //
 //
 //
@@ -105,13 +1871,16 @@ __webpack_require__.r(__webpack_exports__);
 //
 //
 //
+//
+
 
 
 /* harmony default export */ __webpack_exports__["default"] = ({
   name: "app",
   components: {
     appMainMenu: _components_menus_MainMenu_vue__WEBPACK_IMPORTED_MODULE_0__["default"],
-    signinLogin: _components_SigninLogin_vue__WEBPACK_IMPORTED_MODULE_1__["default"]
+    signinLogin: _components_SigninLogin_vue__WEBPACK_IMPORTED_MODULE_1__["default"],
+    footerSection: _components_Footer_vue__WEBPACK_IMPORTED_MODULE_2__["default"]
   }
 });
 
@@ -201,6 +1970,12 @@ __webpack_require__.r(__webpack_exports__);
 //
 //
 //
+//
+//
+//
+//
+//
+//
 
 /* harmony default export */ __webpack_exports__["default"] = ({
   data: function data() {
@@ -212,7 +1987,9 @@ __webpack_require__.r(__webpack_exports__);
         name: "Load Game",
         route: "/loaded"
       }],
-      level: 1
+      level: 1,
+      characterClasses: ["Hunter", "Sorcerer", "Shaman", "Merchant", "Warrior", "Priest", "Bard", "Rogue"],
+      chosenClass: "-- Select Class --"
     };
   },
   methods: {
@@ -221,6 +1998,9 @@ __webpack_require__.r(__webpack_exports__);
       alert("character added");
       var character = {
         portrait: document.getElementById("portrait").value,
+        characterType: "pc",
+        type: "creature",
+        characterClass: document.getElementById("characterClass").value,
         name: document.getElementById("name").value,
         alias: document.getElementById("alias").value,
         age: document.getElementById("age").value,
@@ -239,7 +2019,10 @@ __webpack_require__.r(__webpack_exports__);
         hitpoints: document.getElementById("hitpoints").innerHTML,
         tempHitpoints: document.getElementById("hitpoints").innerHTML,
         sanity: document.getElementById("sanity").innerHTML,
+        tempSanity: document.getElementById("sanity").innerHTML,
         charisma: document.getElementById("charisma").innerHTML,
+        pPerception: 12,
+        weapons: [],
         actions: [{
           name: "Attack"
         }, {
@@ -252,7 +2035,8 @@ __webpack_require__.r(__webpack_exports__);
           name: "Intimidate"
         }, {
           name: "Pickpocket"
-        }]
+        }],
+        classActions: []
       };
 
       if (character.stats.pow > 15) {
@@ -283,27 +2067,25 @@ __webpack_require__.r(__webpack_exports__);
         console.log(character.actions);
       }
 
-      this.$store.state.characterList.push(character);
+      console.log(character);
+      this.$store.state.characterList[0].push(character);
+      console.log(this.$store.state.characterList);
     }
   }
 });
 
 /***/ }),
 
-/***/ "./node_modules/babel-loader/lib/index.js!./node_modules/vue-loader/lib/index.js?!./src/components/Demo.vue?vue&type=script&lang=js&":
-/*!********************************************************************************************************************************************!*\
-  !*** ./node_modules/babel-loader/lib!./node_modules/vue-loader/lib??vue-loader-options!./src/components/Demo.vue?vue&type=script&lang=js& ***!
-  \********************************************************************************************************************************************/
+/***/ "./node_modules/babel-loader/lib/index.js!./node_modules/vue-loader/lib/index.js?!./src/components/Footer.vue?vue&type=script&lang=js&":
+/*!**********************************************************************************************************************************************!*\
+  !*** ./node_modules/babel-loader/lib!./node_modules/vue-loader/lib??vue-loader-options!./src/components/Footer.vue?vue&type=script&lang=js& ***!
+  \**********************************************************************************************************************************************/
 /*! exports provided: default */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _data_locations_json__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../data/locations.json */ "./src/data/locations.json");
-var _data_locations_json__WEBPACK_IMPORTED_MODULE_0___namespace = /*#__PURE__*/__webpack_require__.t(/*! ../data/locations.json */ "./src/data/locations.json", 1);
-/* harmony import */ var _data_plots_json__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../data/plots.json */ "./src/data/plots.json");
-var _data_plots_json__WEBPACK_IMPORTED_MODULE_1___namespace = /*#__PURE__*/__webpack_require__.t(/*! ../data/plots.json */ "./src/data/plots.json", 1);
-/* harmony import */ var _mixins_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../mixins.js */ "./src/mixins.js");
+/* harmony import */ var _menus_FooterMenu_vue__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./menus/FooterMenu.vue */ "./src/components/menus/FooterMenu.vue");
 //
 //
 //
@@ -311,306 +2093,10 @@ var _data_plots_json__WEBPACK_IMPORTED_MODULE_1___namespace = /*#__PURE__*/__web
 //
 //
 //
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
-
 
 /* harmony default export */ __webpack_exports__["default"] = ({
-  data: function data() {
-    var chosenWorld = 0;
-    var storyEls = this.$store.state.worlds[chosenWorld].environment.plots;
-    var beings = this.$store.state.worlds[chosenWorld].npcs.concat(this.$store.state.worlds[chosenWorld].creatures);
-    var npcs = this.$store.state.worlds[chosenWorld].npcs;
-    var creatures = this.$store.state.worlds[chosenWorld].creatures;
-    var weaponry = this.$store.state.worlds[chosenWorld].environment.weaponry;
-    var inventory = this.$store.state.worlds[chosenWorld].environment.inventory;
-    var portents = this.$store.state.worlds[chosenWorld].environment.portents;
-    var locations = this.$store.state.worlds[chosenWorld].environment.locations;
-    var pantheon = this.$store.state.worlds[chosenWorld].environment.pantheon;
-    var menus = this.$store.state.worlds[chosenWorld].environment.plots;
-    var shown = "";
-    var story = "";
-    var territory = "";
-    var content = {
-      title: this.$store.state.selectedGame.name,
-      lastDescription: this.$store.state.selectedGame.synopsis
-    };
-    return {
-      menus: menus,
-      storyEls: storyEls,
-      beings: beings,
-      weaponry: weaponry,
-      inventory: inventory,
-      pantheon: pantheon,
-      shown: shown,
-      content: content,
-      portents: portents,
-      story: story,
-      locations: locations,
-      chosenWorld: chosenWorld,
-      globalTime: {
-        months: {
-          january: "January",
-          february: "February",
-          march: "March",
-          april: "April",
-          may: "May",
-          june: "June",
-          august: "August",
-          september: "September",
-          october: "October",
-          november: "November",
-          december: "December"
-        },
-        days: {
-          monday: "Monday",
-          tuesday: "Tuesday",
-          wednesday: "Wednesday",
-          thursday: "Thursday",
-          friday: "Friday",
-          saturday: "Saturday",
-          sunday: "Sunday"
-        }
-      }
-    };
-  },
-  methods: {
-    hideLeftMenu: function hideLeftMenu() {
-      var leftMenu = document.getElementById("leftMenu");
-      leftMenu.classList.toggle("hiddenLeftMenu");
-    },
-    storyMenu: function storyMenu() {
-      this.menus = this.storyEls;
-      this.shown = "";
-      this.hideLeftMenu();
-    },
-    beingsMenu: function beingsMenu() {
-      this.menus = this.beings;
-      this.hideLeftMenu();
-    },
-    weaponryMenu: function weaponryMenu() {
-      this.menus = this.weaponry;
-      this.hideLeftMenu();
-    },
-    inventoryMenu: function inventoryMenu() {
-      this.menus = this.inventory;
-      this.hideLeftMenu();
-    },
-    portentsMenu: function portentsMenu() {
-      this.menus = this.portents;
-      this.hideLeftMenu();
-    },
-    pantheonMenu: function pantheonMenu() {
-      this.menus = this.pantheon;
-      this.hideLeftMenu();
-    },
-    locationsMenu: function locationsMenu() {
-      this.menus = this.locations;
-      this.hideLeftMenu();
-    },
-    addElement: function addElement(element) {
-      this.minorPlotGenerator(element);
-      this.$store.state.storyElements.push(this.story);
-    },
-    addMainElement: function addMainElement() {
-      this.mainPlotGenerator();
-      this.$store.state.storyElements.push(this.story);
-    },
-    showElement: function showElement(element) {
-      this.shown = element;
-    },
-    chooseOption: function chooseOption(options) {
-      var optionsNumber = Math.floor(Math.random() * Object.keys(options).length);
-      var choosy = Object.values(options);
-
-      for (var item in choosy) {
-        return choosy[optionsNumber];
-      }
-    },
-    booleanGen: function booleanGen() {
-      var extNum = Math.floor(Math.random() * 2);
-      return extNum;
-    },
-    chooseNPC: function chooseNPC() {
-      var num = this.booleanGen();
-      var name = this.generateName(num);
-      var npcAlignment = this.chooseOption(_data_plots_json__WEBPACK_IMPORTED_MODULE_1__.NPC.alignment);
-      var npcBackground = this.chooseOption(_data_plots_json__WEBPACK_IMPORTED_MODULE_1__.NPC.background);
-      var npcLeitmotiv = this.chooseOption(_data_plots_json__WEBPACK_IMPORTED_MODULE_1__.NPC.leitmotiv);
-      return name + " (who is " + npcAlignment + "), " + npcBackground + " and " + npcLeitmotiv;
-    },
-    timeFrame: function timeFrame() {
-      var timeframe = this.chooseOption(_data_plots_json__WEBPACK_IMPORTED_MODULE_1__.timeframe);
-      var yesNo = this.booleanGen();
-
-      if (yesNo == 0) {
-        return timeframe + ". ";
-      } else {
-        return "";
-      }
-    },
-    externalPlot: function externalPlot(option) {
-      var choosy = Object.values(_data_plots_json__WEBPACK_IMPORTED_MODULE_1__.externalPlot);
-
-      for (var item in choosy) {
-        var externalPlot = this.chooseOption(choosy[option]);
-        var yesNo = this.booleanGen();
-
-        if (yesNo == 0) {
-          return " Also, " + externalPlot + " is affecting the region.";
-        } else {
-          return "";
-        }
-      }
-    },
-    plotTwist: function plotTwist() {
-      var plotTwist = this.chooseOption(_data_plots_json__WEBPACK_IMPORTED_MODULE_1__.plotTwist);
-      var yesNo = this.booleanGen();
-
-      if (yesNo == 0) {
-        return "...but unbeknownst to the heroes, " + plotTwist;
-      } else {
-        return "";
-      }
-    },
-    religiousPlot: function religiousPlot() {
-      var religiousPlot = this.chooseOption(_data_plots_json__WEBPACK_IMPORTED_MODULE_1__.religionPlot);
-      var yesNo = this.booleanGen();
-
-      if (yesNo == 0) {
-        return "Also, " + religiousPlot;
-      } else {
-        return "";
-      }
-    },
-    getMonth: function getMonth(number) {
-      var months = Object.values(this.globalTime.months);
-      var month = months[number];
-      return month;
-    },
-    getDay: function getDay(number) {
-      var days = Object.values(this.globalTime.days);
-      var day = days[number];
-      return day;
-    },
-    getSeason: function getSeason(month) {
-      if (month == 2 || month == 3 || month == 4) {
-        return "Spring";
-      } else if (month == 5 || month == 6 || month == 7) {
-        return "Summer";
-      } else if (month == 8 || month == 9 || month == 10) {
-        return "Autumn";
-      } else {
-        return "Winter";
-      }
-    },
-    mainPlotGenerator: function mainPlotGenerator() {
-      var extNum = this.booleanGen();
-      var monthNum = Math.floor(Math.random() * 12);
-      var dayNum = Math.floor(Math.random() * 7);
-      var yearNum = "Y" + (3250 + Math.floor(Math.random() * 15));
-      var day = this.getDay(dayNum);
-      var month = this.getMonth(monthNum);
-      var season = this.getSeason(monthNum);
-      var npc = this.chooseNPC();
-      var time = this.timeFrame();
-      var extPlot = this.externalPlot(extNum);
-      var plotTwist = this.plotTwist();
-      var religiousPlot = this.religiousPlot();
-      this.story = "<img src='https://www.gannett-cdn.com/media/2017/09/21/USATODAY/USATODAY/636415913442262218-GettyImages-481013807.jpg?width=1080&quality=50' /><div class='description'><h3>Main Plot</h3><p>It is the " + season + " of " + yearNum + ". The date, " + day + " the " + (dayNum + 1) + " of " + month + ". </p><p>" + npc + ". " + time + extPlot + religiousPlot + "<p>" + plotTwist + "</p></div>";
-    },
-    minorPlotGenerator: function minorPlotGenerator(env) {
-      var title = env.characterClass;
-      var portrait = env.portrait;
-      var extNum = this.booleanGen();
-      var territory = env.territory;
-      var npc = this.chooseNPC();
-      var time = this.timeFrame();
-      var extPlot = this.externalPlot(extNum);
-      var plotTwist = this.plotTwist();
-      var religiousPlot = this.religiousPlot();
-      this.story = "<img src='" + portrait + "' /><div class='description'><h3>" + title + "</h3><p>The characters arrive to the " + territory + " of " + this.generateName() + "</p><p>" + npc + ". " + time + extPlot + religiousPlot + "<p>" + plotTwist + "</p></div>";
-    },
-    removeStory: function removeStory(story) {
-      var indexInd = this.$store.state.storyElements.indexOf(story);
-      this.$store.state.storyElements.splice(indexInd, 1);
-    }
+  components: {
+    footerMenu: _menus_FooterMenu_vue__WEBPACK_IMPORTED_MODULE_0__["default"]
   }
 });
 
@@ -666,29 +2152,39 @@ __webpack_require__.r(__webpack_exports__);
   data: function data() {
     var settingInfo = this.$store.state.worlds;
     var gamesInfo = this.$store.state.games;
+    var selectedGame = [];
 
     function selectGame(meh) {}
 
     return {
       settingInfo: settingInfo,
       gamesInfo: gamesInfo,
+      selectedGame: selectedGame,
       nav: [{
         name: "Add Characters",
         route: "/character-creation"
       }, {
         name: "Load Game",
         route: "/loaded"
-      }],
-      chosenGame: {
-        name: null
-      }
+      }]
     };
   },
   methods: {
     selectGame: function selectGame(meh) {
-      var selected = document.getElementById("gameSelector").value;
       console.log(meh);
-      console.log(selected);
+      console.log(this.selectedGame);
+    },
+    populateGame: function populateGame(meh) {
+      this.selectedGame = meh;
+      var chosenGame = this.gamesInfo.find(function (game) {
+        return game;
+      });
+      console.log(this.$store.state.characterList);
+      this.$store.state.characterList.push(chosenGame.contents.characters);
+      this.$store.state.characterList.push(chosenGame.contents.plots);
+      this.$store.state.characterList.push(chosenGame.notes);
+      this.$store.state.characterList.push(chosenGame.synopsis);
+      this.$store.state.characterList.push(chosenGame.name);
     },
     revealNew: function revealNew() {
       document.getElementById("newGameSection").style.display = "block";
@@ -698,6 +2194,38 @@ __webpack_require__.r(__webpack_exports__);
       document.getElementById("newGameSection").style.display = "none";
       document.getElementById("loadGameSection").style.display = "block";
     }
+  }
+});
+
+/***/ }),
+
+/***/ "./node_modules/babel-loader/lib/index.js!./node_modules/vue-loader/lib/index.js?!./src/components/Home.vue?vue&type=script&lang=js&":
+/*!********************************************************************************************************************************************!*\
+  !*** ./node_modules/babel-loader/lib!./node_modules/vue-loader/lib??vue-loader-options!./src/components/Home.vue?vue&type=script&lang=js& ***!
+  \********************************************************************************************************************************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+/* harmony default export */ __webpack_exports__["default"] = ({
+  data: function data() {
+    return {
+      pageBanner: this.$store.state.mainPageBanner,
+      mainPageText: this.$store.state.mainPageText
+    };
   }
 });
 
@@ -854,21 +2382,74 @@ __webpack_require__.r(__webpack_exports__);
 //
 //
 //
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 /* harmony default export */ __webpack_exports__["default"] = ({
-  props: ['character', 'targets', 'statNames', 'scenery'],
+  props: ["character", "targets", "statNames", "scenery"],
   data: function data() {
     return {
-      selectAction: '-- Select Action --',
-      selectClassAction: '-- Select Class Action --',
-      selectTarget: '-- Select Target --',
-      selectWeapon: '-- Select Weapon --',
-      selectedAction: '',
-      selectedClassAction: '',
-      selectedTarget: {},
+      selectAction: "-- Select Action --",
+      //selectClassAction: "-- Select Class Action --",
+      selectTarget: "-- Select Target --",
+      selectWeapon: "-- Select Weapon --",
+      selectedAction: "",
+      selectedClassAction: "-- Select Class Action --",
+      selectedTarget: [],
+      weaponType: "",
       selectedWeapon: {},
       charIndex: 0,
-      resultMessage: '',
+      resultMessage: "",
       damage: null,
       damageBrackets: [],
       attackValue: null,
@@ -880,7 +2461,7 @@ __webpack_require__.r(__webpack_exports__);
       var roll = this.rollDice(20);
       var attackSuccess = false;
       this.$store.state.rollResult = roll;
-      document.getElementById('modalOverlay').style.display = 'block';
+      document.getElementById("modalOverlay").style.display = "block";
 
       if (roll === 20) {
         attackSuccess = true;
@@ -948,85 +2529,106 @@ __webpack_require__.r(__webpack_exports__);
     },
     chooseAction: function chooseAction(index) {
       if (this.selectAction == "Attack") {
-        console.log('chosen attack for an action');
-        document.getElementsByClassName('weaponChoice')[index].style.display = "block";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "block";
         this.attackValue = this.character.martialProwess;
         this.defenseValue = this.selectedTarget[0].defenseValue;
       } else if (this.selectAction == "Curse") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = this.character.charisma;
         this.defenseValue = 16 - (this.selectedTarget[0].stats.pow - 10) / 2;
       } else if (this.selectAction == "Bless") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = (this.character.stats.pow - 10) / 2;
         this.defenseValue = 16 - (this.selectedTarget[0].stats.pow - 10) / 2;
       } else if (this.selectAction == "Heal") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = (this.character.stats.dex - 10) / 2;
         this.defenseValue = 16 - (this.selectedTarget[0].stats.con - 10) / 2;
       } else if (this.selectAction == "Haggle") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = this.character.charisma;
         this.defenseValue = 16 - (this.selectedTarget[0].stats.pow - 10) / 2;
       } else if (this.selectAction == "Persuade") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = this.character.charisma;
         this.defenseValue = 16 - (this.selectedTarget[0].stats.pow - 10) / 2;
       } else if (this.selectAction == "Intimidate") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = this.character.charisma;
         this.defenseValue = 16 - (this.selectedTarget[0].stats.pow - 10) / 2;
       } else if (this.selectAction == "Pickpocket") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = (this.character.stats.dex - 10) / 2;
         this.defenseValue = this.selectedTarget[0].pPerception;
+      } else if (this.selectAction == "Perception") {
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
+        this.attackValue = (this.character.pPerception - 10) / 2;
+        this.defenseValue = 12;
+      } else if (this.selectAction == "Jump") {
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
+        this.attackValue = (this.character.stats.dex - 10) / 2;
+        this.defenseValue = 12;
+      } else if (this.selectAction == "Climb") {
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
+        this.attackValue = ((this.character.stats.str + this.character.stats.dex + this.character.stats.sta) / 3 - 10) / 2;
+        this.defenseValue = 12;
+      } else if (this.selectAction == "Swim") {
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
+        this.attackValue = (this.character.stats.sta - 10) / 2;
+        this.defenseValue = 12;
       } else if (this.selectAction == "Manipulate Mechanism") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = (this.character.stats.dex - 10) / 2;
         this.defenseValue = this.selectedTarget[0].pPerception;
       } else if (this.selectAction == "Charm") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = (this.character.stats.pow - 10) / 2;
         this.defenseValue = this.selectedTarget[0].charisma;
       } else if (this.selectAction == "Detect Magic") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = (this.character.stats.pow - 10) / 2;
         this.defenseValue = 15;
       } else if (this.selectAction == "Light Fire") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = (this.character.stats.pow - 10) / 2;
         this.defenseValue = this.selectedTarget[0].pPerception;
       } else if (this.selectAction == "Telekinesis") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = (this.character.stats.pow - 10) / 2;
         this.defenseValue = 10;
       } else if (this.selectAction == "Terror") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = (this.character.stats.pow - 10) / 2;
         this.defenseValue = this.selectedTarget[0].stats.pow;
       } else if (this.selectAction == "Illusion of Self") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = (this.character.charisma - 10) / 2;
         this.defenseValue = this.selectedTarget[0].pPerception;
       } else if (this.selectAction == "Climb") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = (this.character.stats.dex - 10) / 2;
         this.defenseValue = 11;
       } else if (this.selectAction == "Balance") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = (this.character.stats.dex - 10) / 2;
         this.defenseValue = 11;
       } else if (this.selectAction == "Jump") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = (this.character.stats.dex - 10) / 2 + (this.character.stats.str - 10) / 2 / 2;
         this.defenseValue = 13;
       } else if (this.selectAction == "Perception") {
-        document.getElementsByClassName('weaponChoice')[index].style.display = "none";
+        document.getElementsByClassName("weaponChoice")[index].style.display = "none";
         this.attackValue = (this.character.stats.dex - 10) / 2;
         this.defenseValue = 11;
       }
     },
     classAction: function classAction(target) {
+      if (this.selectedClassAction === "Melee") {
+        this.weaponType = "Melee";
+      } else if (this.selectedClassAction === "Ranged") {
+        this.weaponType = "Ranged";
+      }
+
       console.log("the target" + target, "the selected class action " + this.selectedClassAction);
     },
     sceneryRun: function sceneryRun(active, passive, stat, damage) {
@@ -1035,7 +2637,7 @@ __webpack_require__.r(__webpack_exports__);
       this.$store.state.rollResult = roll;
       var forStat = Object.values(active);
       var bonus = (forStat[stat] - 10) / 2;
-      document.getElementById('modalOverlay').style.display = 'block';
+      document.getElementById("modalOverlay").style.display = "block";
 
       if (roll === 20) {
         attackSuccess = true;
@@ -1059,6 +2661,12 @@ __webpack_require__.r(__webpack_exports__);
       }
     },
     chooseTarget: function chooseTarget(subject) {
+      if (subject == "Environment") {
+        this.selectedTarget = {
+          name: "Environment"
+        };
+      }
+
       this.selectedTarget = this.targets.filter(function (item) {
         return item.name === subject;
       });
@@ -1085,6 +2693,8 @@ __webpack_require__.r(__webpack_exports__);
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _mixins_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../mixins.js */ "./src/mixins.js");
 /* harmony import */ var _EncElement_vue__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./EncElement.vue */ "./src/components/environment/EncElement.vue");
+/* harmony import */ var axios__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! axios */ "./node_modules/axios/index.js");
+/* harmony import */ var axios__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(axios__WEBPACK_IMPORTED_MODULE_2__);
 //
 //
 //
@@ -1162,6 +2772,8 @@ __webpack_require__.r(__webpack_exports__);
 //
 //
 //
+//
+
 
 
 /* harmony default export */ __webpack_exports__["default"] = ({
@@ -1173,7 +2785,7 @@ __webpack_require__.r(__webpack_exports__);
       characters: this.$store.state.characterList,
       statNames: this.$store.state["char"].stats,
       targets: this.$store.state.targets,
-      scenery: this.$store.state.selectedGame.scenery,
+      scenery: this.$store.state.selectedGame.npcs,
       creatures: true,
       encounter: this.$store.state.selectedGame.npcs,
       targetDefense: null,
@@ -1242,17 +2854,18 @@ __webpack_require__.r(__webpack_exports__);
     npcMenu: function npcMenu() {
       this.hideRightMenu();
       this.creatures = true;
-      this.encounter = this.$store.state.selectedGame.npcs;
+      this.encounter = this.$store.state.worlds[this.$store.state.chosenWorld].npcs;
     },
     monsterMenu: function monsterMenu() {
       this.hideRightMenu();
       this.creatures = true;
-      this.encounter = this.$store.state.selectedGame.creatures;
+      this.encounter = this.$store.state.worlds[this.$store.state.chosenWorld].creatures;
     },
     sceneryMenu: function sceneryMenu() {
       this.hideRightMenu();
       this.creatures = false;
-      this.encounter = this.$store.state.selectedGame.creatures;
+      this.encounter = this.$store.state.worlds[this.$store.state.chosenWorld].scenery;
+      this.scenery = this.encounter;
     },
     genderizer: function genderizer() {
       var _boolean = Math.random() >= 0.5;
@@ -1270,30 +2883,95 @@ __webpack_require__.r(__webpack_exports__);
     hideRightMenu: function hideRightMenu() {
       var rightMenu = document.getElementById("rightMenu");
       rightMenu.classList.toggle("hiddenRightMenu");
+    },
+    saveCharacters: function saveCharacters(targetList) {
+      var characters = [];
+      var _iteratorNormalCompletion = true;
+      var _didIteratorError = false;
+      var _iteratorError = undefined;
+
+      try {
+        for (var _iterator = targetList[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+          var character = _step.value;
+
+          if (character.characterType === "pc") {
+            characters.push(character);
+          }
+        }
+        /*axios
+          .get("https://fantasy-storyteller-b92e8.firebaseio.com/")
+          .then(response => (this.$store.state.games = response));
+        if (this.$store.state.userLogin === true) {
+          this.$store.state.characterList[this.$store.state.chosenGame] = [];
+          this.$store.state.characterList[this.$store.state.chosenGame].push(
+            characters
+          );
+          console.log(
+            "characters in List after push",
+            this.$store.state.characterList[0]
+          );
+          console.log("https://fantasy-storyteller-b92e8.firebaseio.com/");
+        }*/
+
+      } catch (err) {
+        _didIteratorError = true;
+        _iteratorError = err;
+      } finally {
+        try {
+          if (!_iteratorNormalCompletion && _iterator["return"] != null) {
+            _iterator["return"]();
+          }
+        } finally {
+          if (_didIteratorError) {
+            throw _iteratorError;
+          }
+        }
+      }
+
+      axios__WEBPACK_IMPORTED_MODULE_2___default.a.get("https://fantasy-storyteller-b92e8.firebaseio.com/", {
+        headers: {
+          "Access-Control-Allow-Origin": "*"
+        },
+        proxy: {
+          host: "104.236.174.88",
+          port: 3128
+        }
+      }).then(function (response) {
+        console.log("response is : " + response.data);
+      })["catch"](function (error) {
+        if (error.response) {
+          console.log(error.response.headers);
+        } else if (error.request) {
+          console.log(error.request);
+        } else {
+          console.log(error.message);
+        }
+
+        console.log(error.config);
+      });
     }
   },
   mounted: function mounted() {
-    this.targets = [];
-    var _iteratorNormalCompletion = true;
-    var _didIteratorError = false;
-    var _iteratorError = undefined;
+    var _iteratorNormalCompletion2 = true;
+    var _didIteratorError2 = false;
+    var _iteratorError2 = undefined;
 
     try {
-      for (var _iterator = this.characters[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-        var character = _step.value;
+      for (var _iterator2 = this.$store.state.characterList[0][Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
+        var character = _step2.value;
         this.addTarget(character);
       }
     } catch (err) {
-      _didIteratorError = true;
-      _iteratorError = err;
+      _didIteratorError2 = true;
+      _iteratorError2 = err;
     } finally {
       try {
-        if (!_iteratorNormalCompletion && _iterator["return"] != null) {
-          _iterator["return"]();
+        if (!_iteratorNormalCompletion2 && _iterator2["return"] != null) {
+          _iterator2["return"]();
         }
       } finally {
-        if (_didIteratorError) {
-          throw _iteratorError;
+        if (_didIteratorError2) {
+          throw _iteratorError2;
         }
       }
     }
@@ -1400,12 +3078,23 @@ var _data_plots_json__WEBPACK_IMPORTED_MODULE_1___namespace = /*#__PURE__*/__web
 //
 //
 //
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 
 
 /* harmony default export */ __webpack_exports__["default"] = ({
   data: function data() {
-    var chosenWorld = 0;
+    var chosenWorld = this.$store.state.chosenWorld;
     var storyEls = this.$store.state.worlds[chosenWorld].environment.plots;
     var beings = this.$store.state.worlds[chosenWorld].npcs.concat(this.$store.state.worlds[chosenWorld].creatures);
     var npcs = this.$store.state.worlds[chosenWorld].npcs;
@@ -1628,6 +3317,55 @@ var _data_plots_json__WEBPACK_IMPORTED_MODULE_1___namespace = /*#__PURE__*/__web
 
 /***/ }),
 
+/***/ "./node_modules/babel-loader/lib/index.js!./node_modules/vue-loader/lib/index.js?!./src/components/menus/FooterMenu.vue?vue&type=script&lang=js&":
+/*!********************************************************************************************************************************************************!*\
+  !*** ./node_modules/babel-loader/lib!./node_modules/vue-loader/lib??vue-loader-options!./src/components/menus/FooterMenu.vue?vue&type=script&lang=js& ***!
+  \********************************************************************************************************************************************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+/* harmony default export */ __webpack_exports__["default"] = ({
+  data: function data() {
+    return {
+      mainmenu: [{
+        name: "Contact",
+        route: "/contact"
+      }, {
+        name: "About",
+        route: "/about"
+      }, {
+        name: "Privacy Policy",
+        route: "/privacy-policy"
+      }]
+    };
+  },
+  methods: {
+    loadLogin: function loadLogin() {
+      var modal = document.getElementById("loginModal");
+      setTimeout(function () {
+        modal.classList.add("revealed");
+      }, 2000);
+    }
+  }
+});
+
+/***/ }),
+
 /***/ "./node_modules/babel-loader/lib/index.js!./node_modules/vue-loader/lib/index.js?!./src/components/menus/MainMenu.vue?vue&type=script&lang=js&":
 /*!******************************************************************************************************************************************************!*\
   !*** ./node_modules/babel-loader/lib!./node_modules/vue-loader/lib??vue-loader-options!./src/components/menus/MainMenu.vue?vue&type=script&lang=js& ***!
@@ -1658,14 +3396,11 @@ __webpack_require__.r(__webpack_exports__);
         name: "Home",
         route: "/"
       }, {
-        name: "Demo",
-        route: "/demo"
+        name: "Game",
+        route: "/game"
       }, {
-        name: "Contact",
-        route: "/contact"
-      }, {
-        name: "About",
-        route: "/about"
+        name: "Tutorial",
+        route: "/tutorial"
       }]
     };
   },
@@ -1685,17 +3420,6 @@ __webpack_require__.r(__webpack_exports__);
 /*!******************************************************************************************************************************************************************!*\
   !*** ./node_modules/mini-css-extract-plugin/dist/loader.js!./node_modules/css-loader/dist/cjs.js!./node_modules/sass-loader/lib/loader.js!./src/scss/style.scss ***!
   \******************************************************************************************************************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-// extracted by mini-css-extract-plugin
-
-/***/ }),
-
-/***/ "./node_modules/mini-css-extract-plugin/dist/loader.js!./node_modules/css-loader/dist/cjs.js!./node_modules/vue-loader/lib/loaders/stylePostLoader.js!./node_modules/sass-loader/lib/loader.js!./node_modules/vue-loader/lib/index.js?!./src/components/Game.vue?vue&type=style&index=0&lang=scss&":
-/*!*******************************************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** ./node_modules/mini-css-extract-plugin/dist/loader.js!./node_modules/css-loader/dist/cjs.js!./node_modules/vue-loader/lib/loaders/stylePostLoader.js!./node_modules/sass-loader/lib/loader.js!./node_modules/vue-loader/lib??vue-loader-options!./src/components/Game.vue?vue&type=style&index=0&lang=scss& ***!
-  \*******************************************************************************************************************************************************************************************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -2093,36 +3817,6 @@ process.umask = function() { return 0; };
 }(typeof self === "undefined" ? typeof global === "undefined" ? this : global : self));
 
 /* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(/*! ./../webpack/buildin/global.js */ "./node_modules/webpack/buildin/global.js"), __webpack_require__(/*! ./../process/browser.js */ "./node_modules/process/browser.js")))
-
-/***/ }),
-
-/***/ "./node_modules/style-loader/index.js!./node_modules/mini-css-extract-plugin/dist/loader.js!./node_modules/css-loader/dist/cjs.js!./node_modules/vue-loader/lib/loaders/stylePostLoader.js!./node_modules/sass-loader/lib/loader.js!./node_modules/vue-loader/lib/index.js?!./src/components/Game.vue?vue&type=style&index=0&lang=scss&":
-/*!***********************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** ./node_modules/style-loader!./node_modules/mini-css-extract-plugin/dist/loader.js!./node_modules/css-loader/dist/cjs.js!./node_modules/vue-loader/lib/loaders/stylePostLoader.js!./node_modules/sass-loader/lib/loader.js!./node_modules/vue-loader/lib??vue-loader-options!./src/components/Game.vue?vue&type=style&index=0&lang=scss& ***!
-  \***********************************************************************************************************************************************************************************************************************************************************************************************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-
-var content = __webpack_require__(/*! !../../node_modules/mini-css-extract-plugin/dist/loader.js!../../node_modules/css-loader/dist/cjs.js!../../node_modules/vue-loader/lib/loaders/stylePostLoader.js!../../node_modules/sass-loader/lib/loader.js!../../node_modules/vue-loader/lib??vue-loader-options!./Game.vue?vue&type=style&index=0&lang=scss& */ "./node_modules/mini-css-extract-plugin/dist/loader.js!./node_modules/css-loader/dist/cjs.js!./node_modules/vue-loader/lib/loaders/stylePostLoader.js!./node_modules/sass-loader/lib/loader.js!./node_modules/vue-loader/lib/index.js?!./src/components/Game.vue?vue&type=style&index=0&lang=scss&");
-
-if(typeof content === 'string') content = [[module.i, content, '']];
-
-var transform;
-var insertInto;
-
-
-
-var options = {"hmr":true}
-
-options.transform = transform
-options.insertInto = undefined;
-
-var update = __webpack_require__(/*! ../../node_modules/style-loader/lib/addStyles.js */ "./node_modules/style-loader/lib/addStyles.js")(content, options);
-
-if(content.locals) module.exports = content.locals;
-
-if(false) {}
 
 /***/ }),
 
@@ -2710,9 +4404,9 @@ exports.clearImmediate = (typeof self !== "undefined" && self.clearImmediate) ||
 
 /***/ }),
 
-/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/App.vue?vue&type=template&id=2103f570&":
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/App.vue?vue&type=template&id=5c87d7e8&":
 /*!**********************************************************************************************************************************************************************************!*\
-  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/App.vue?vue&type=template&id=2103f570& ***!
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/App.vue?vue&type=template&id=5c87d7e8& ***!
   \**********************************************************************************************************************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
@@ -2721,16 +4415,16 @@ exports.clearImmediate = (typeof self !== "undefined" && self.clearImmediate) ||
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
-var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{attrs:{"id":"app"}},[_c('app-main-menu'),_vm._v(" "),_c('router-view'),_vm._v(" "),_c('signin-login')],1)}
+var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{attrs:{"id":"app"}},[_c('app-main-menu'),_vm._v(" "),_c('router-view'),_vm._v(" "),_c('footer-section'),_vm._v(" "),_c('signin-login')],1)}
 var staticRenderFns = []
 
 
 
 /***/ }),
 
-/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/About.vue?vue&type=template&id=316af4aa&":
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/About.vue?vue&type=template&id=b3f6b2b4&":
 /*!***********************************************************************************************************************************************************************************************!*\
-  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/About.vue?vue&type=template&id=316af4aa& ***!
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/About.vue?vue&type=template&id=b3f6b2b4& ***!
   \***********************************************************************************************************************************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
@@ -2740,15 +4434,33 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
 var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _vm._m(0)}
-var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper"},[_c('h1',[_vm._v("About")])])}]
+var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper contentText"},[_c('h1',[_vm._v("About")]),_vm._v(" "),_c('p',[_vm._v("Joseph Ortega, the author of the programming and the settings, is a Senior Front End Developer originally from Malaga, Spain, who lives in London, UK.")]),_vm._v(" "),_c('p',[_vm._v("With over 20 years of experience in tabletop RPGs and coming from a city that was once thriving in such activities, he has learned over the years of the nuances of different systems and editions, what made them good and what made them... not so good.")]),_vm._v(" "),_c('p',[_vm._v("Both having learned from Tabletop and Live Action RPGs he has Seen the industry rise, fall and rise again, and with the appearance of streaming shows like Aquisitions Inc, Critical Role, Harmonquest and Maze Arcana, this is the perfect point in time for this application to come and help those who still can't get on board hoist themselves in this incredible voyage that is tabletop roleplaying games.")]),_vm._v(" "),_c('p',[_vm._v("However, with the demand that is surging in recent years for groups to find that member that will take on the mantle, I found that sometimes the game systems and the cumbersome preparations for a game get in the way of a good story. The Mercer effect doesn't make things easier (bless Matt in all his glory) for novice Storytellers, so I am putting this application here to neutralize those extremely high expectations by taking an entirely different route.")]),_vm._v(" "),_c('p',[_vm._v("I thought that this is like a gateway to more fully fledged games like D&D. Some stepping stone for people who either have no time to sit and write an adventure, or prepare a retail module like Tomb of Annihilation.")]),_vm._v(" "),_c('h3',[_vm._v("Disclaimer")]),_vm._v(" "),_c('p',[_c('i',[_vm._v("I am here to produce a system that will allow people to connect and tell stories together. Something for everybody to enjoy, regardless of their background, gender, religion, sexual orientation, political afiliations, age or culture. I believe the world will only get better when we treat each other as equal and these things are never a factor in order to make friends and enjoy our time together. There is such thing as a \"too-high-horse\" and it's just another pathway to vanity (incidentally, people like that lack the ability to reflect on themselves). And frankly... if our horses have such long legs we will never be further from each other.")])]),_vm._v(" "),_c('p',[_c('i',[_vm._v("I am never going to get involved in identity politics. I made the algorythm in a way that about 50% of characters and creatures are male and the other 50% female and that is how they get randomly generated. There are no stat or skill differences between the two. I will never waste my time explaining myself about why some wording is in such orther or any other nuances, why I'm not writing about characters that decide they identify as a mortar spatula or why women are very scantly clad in sword and sorcery settings. My only answer is that in such settings, except in very civilised areas EVERYBODY is wearing very revealing outfits, regardless of gender. Wether you appreciate the male figure or it goes completely over your head is a different matter.")])]),_vm._v(" "),_c('p',[_c('i',[_vm._v("Other than this, you can make the world in whatever way you want.")])])])}]
 
 
 
 /***/ }),
 
-/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/CCreation.vue?vue&type=template&id=5b6533a7&":
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Advice.vue?vue&type=template&id=241ffe40&":
+/*!************************************************************************************************************************************************************************************************!*\
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/Advice.vue?vue&type=template&id=241ffe40& ***!
+  \************************************************************************************************************************************************************************************************/
+/*! exports provided: render, staticRenderFns */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
+var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _vm._m(0)}
+var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper"},[_c('h1',[_vm._v("Advice")])])}]
+
+
+
+/***/ }),
+
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/CCreation.vue?vue&type=template&id=9f133972&":
 /*!***************************************************************************************************************************************************************************************************!*\
-  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/CCreation.vue?vue&type=template&id=5b6533a7& ***!
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/CCreation.vue?vue&type=template&id=9f133972& ***!
   \***************************************************************************************************************************************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
@@ -2757,7 +4469,7 @@ var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
-var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper"},[_c('h2',[_vm._v("Character Creation")]),_vm._v(" "),_c('h3',[_vm._v("This is to create the character")]),_vm._v(" "),_c('h4',[_vm._v("Name:")]),_vm._v(" "),_c('input',{attrs:{"id":"name","type":"text"}}),_vm._v(" "),_c('h4',[_vm._v("Alias:")]),_vm._v(" "),_c('input',{attrs:{"id":"alias","type":"text"}}),_vm._v(" "),_c('h4',[_vm._v("Age:")]),_vm._v(" "),_c('input',{attrs:{"id":"age","type":"number"}}),_vm._v(" "),_c('h4',[_vm._v("Gender:")]),_vm._v(" "),_vm._m(0),_vm._v(" "),_vm._m(1),_vm._v(" "),_c('input',{attrs:{"id":"portrait","type":"text"}}),_vm._v(" "),_c('h4',[_vm._v("Stats:")]),_vm._v(" "),_c('div',[_vm._v("Stat Points Available: "+_vm._s(this.$store.state.char.statNumbers))]),_vm._v(" "),_c('ul',_vm._l((this.$store.state.char.stats),function(stat,index){return _c('li',{key:index},[_vm._v("\n      "+_vm._s(stat.name)+" -\n      "),_c('input',{staticClass:"statBlock",domProps:{"value":stat.value}}),_vm._v(" "),_c('button',{on:{"click":function($event){return _vm.addStat(stat.value, index)}}},[_vm._v("+")]),_vm._v(" "),_c('button',{on:{"click":function($event){return _vm.removeStat(stat.value, index)}}},[_vm._v("-")]),_vm._v("\n      - Save: "+_vm._s(Math.floor(stat.value / 2 - 5))+"\n    ")])}),0),_vm._v(" "),_c('div',[_vm._v("\n    Martial Prowess: +\n    "),_c('div',{attrs:{"id":"marProw"}},[_vm._v(_vm._s(Math.floor((this.$store.state.char.stats.sta.value + _vm.level + this.$store.state.char.stats.dex.value) / 5)))])]),_vm._v(" "),_c('div',[_vm._v("\n    Damage Bonus: +\n    "),_c('div',{attrs:{"id":"damBonus"}},[_vm._v(_vm._s(Math.floor((this.$store.state.char.stats.str.value + this.$store.state.char.stats.dex.value) / 5)))])]),_vm._v(" "),_c('div',[_vm._v("\n    Defense Value:\n    "),_c('div',{attrs:{"id":"defValue"}},[_vm._v(_vm._s(Math.floor((this.$store.state.char.stats.str.value + this.$store.state.char.stats.dex.value + this.$store.state.char.stats.sta.value) / 3 + _vm.level)))])]),_vm._v(" "),_c('div',[_vm._v("\n    HitPoints:\n    "),_c('div',{attrs:{"id":"hitpoints"}},[_vm._v(_vm._s(this.$store.state.char.stats.con.value * 5))])]),_vm._v(" "),_c('div',[_vm._v("\n    Sanity:\n    "),_c('div',{attrs:{"id":"sanity"}},[_vm._v(_vm._s(this.$store.state.char.stats.pow.value * 5))])]),_vm._v(" "),_c('div',[_vm._v("\n    Charisma:\n    "),_c('div',{attrs:{"id":"charisma"}},[_vm._v(_vm._s(Math.floor(( this.$store.state.char.stats.pow.value + this.$store.state.char.stats.app.value ) / 2 ) - 10))])]),_vm._v(" "),_c('button',{on:{"click":function($event){return _vm.addCharacter()}}},[_vm._v("Save Character")]),_vm._v(" "),_c('div',{staticClass:"buttonContainer"}),_vm._v(" "),_vm._l((_vm.nav),function(item,index){return _c('router-link',{key:index,attrs:{"tag":"button","to":item.route}},[_vm._v(_vm._s(item.name))])})],2)}
+var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper characterCreation"},[_c('h2',[_vm._v("Character Creation")]),_vm._v(" "),_c('h3',[_vm._v("This is to create the character")]),_vm._v(" "),_c('h4',[_vm._v("Name:")]),_vm._v(" "),_c('input',{attrs:{"id":"name","type":"text"}}),_vm._v(" "),_c('h4',[_vm._v("Alias:")]),_vm._v(" "),_c('input',{attrs:{"id":"alias","type":"text"}}),_vm._v(" "),_c('h4',[_vm._v("Age:")]),_vm._v(" "),_c('input',{attrs:{"id":"age","type":"number"}}),_vm._v(" "),_c('h4',[_vm._v("Gender:")]),_vm._v(" "),_vm._m(0),_vm._v(" "),_vm._m(1),_vm._v(" "),_c('input',{attrs:{"id":"portrait","type":"text"}}),_vm._v(" "),_c('h4',[_vm._v("Stats:")]),_vm._v(" "),_c('div',[_vm._v("Stat Points Available: "+_vm._s(this.$store.state.char.statNumbers))]),_vm._v(" "),_c('ul',_vm._l((this.$store.state.char.stats),function(stat,index){return _c('li',{key:index},[_vm._v("\n      "+_vm._s(stat.name)+" -\n      "),_c('input',{staticClass:"statBlock",domProps:{"value":stat.value}}),_vm._v(" "),_c('button',{on:{"click":function($event){return _vm.addStat(stat.value, index)}}},[_vm._v("+")]),_vm._v(" "),_c('button',{on:{"click":function($event){return _vm.removeStat(stat.value, index)}}},[_vm._v("-")]),_vm._v("\n      - Save: "+_vm._s(Math.floor(stat.value / 2 - 5))+"\n    ")])}),0),_vm._v(" "),_c('div',[_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.chosenClass),expression:"chosenClass"}],attrs:{"id":"characterClass"},on:{"change":function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.chosenClass=$event.target.multiple ? $$selectedVal : $$selectedVal[0]}}},[_c('option',{attrs:{"selected":"","disabled":""}},[_vm._v("-- Choose Character Class --")]),_vm._v(" "),_vm._l((_vm.characterClasses),function(cClass,index){return _c('option',{key:index},[_vm._v(_vm._s(cClass))])})],2)]),_vm._v(" "),_c('div',[_vm._v("\n    Martial Prowess: +\n    "),_c('div',{attrs:{"id":"marProw"}},[_vm._v(_vm._s(Math.floor((this.$store.state.char.stats.sta.value + _vm.level + this.$store.state.char.stats.dex.value) / 5)))])]),_vm._v(" "),_c('div',[_vm._v("\n    Damage Bonus: +\n    "),_c('div',{attrs:{"id":"damBonus"}},[_vm._v(_vm._s(Math.floor((this.$store.state.char.stats.str.value + this.$store.state.char.stats.dex.value) / 5)))])]),_vm._v(" "),_c('div',[_vm._v("\n    Defense Value:\n    "),_c('div',{attrs:{"id":"defValue"}},[_vm._v(_vm._s(Math.floor((this.$store.state.char.stats.str.value + this.$store.state.char.stats.dex.value + this.$store.state.char.stats.sta.value) / 3 + _vm.level)))])]),_vm._v(" "),_c('div',[_vm._v("\n    HitPoints:\n    "),_c('div',{attrs:{"id":"hitpoints"}},[_vm._v(_vm._s(this.$store.state.char.stats.con.value * 5))])]),_vm._v(" "),_c('div',[_vm._v("\n    Sanity:\n    "),_c('div',{attrs:{"id":"sanity"}},[_vm._v(_vm._s(this.$store.state.char.stats.pow.value * 5))])]),_vm._v(" "),_c('div',[_vm._v("\n    Charisma:\n    "),_c('div',{attrs:{"id":"charisma"}},[_vm._v(_vm._s(Math.floor(( this.$store.state.char.stats.pow.value + this.$store.state.char.stats.app.value ) / 2 ) - 10))])]),_vm._v(" "),_c('button',{on:{"click":function($event){return _vm.addCharacter()}}},[_vm._v("Save Character")]),_vm._v(" "),_c('div',{staticClass:"buttonContainer"}),_vm._v(" "),_vm._l((_vm.nav),function(item,index){return _c('router-link',{key:index,attrs:{"tag":"button","to":item.route}},[_vm._v(_vm._s(item.name))])})],2)}
 var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('select',{attrs:{"id":"gender"}},[_c('option',{attrs:{"value":"Male"}},[_vm._v("Male")]),_vm._v(" "),_c('option',{attrs:{"value":"Female"}},[_vm._v("Female")])])},function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('h4',[_vm._v("\n    Add Portrait link\n    "),_c('span',[_vm._v("(optional)")])])}]
 
 
@@ -2782,10 +4494,10 @@ var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _
 
 /***/ }),
 
-/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Demo.vue?vue&type=template&id=78923ea6&":
-/*!**********************************************************************************************************************************************************************************************!*\
-  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/Demo.vue?vue&type=template&id=78923ea6& ***!
-  \**********************************************************************************************************************************************************************************************/
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Footer.vue?vue&type=template&id=5a5746b4&":
+/*!************************************************************************************************************************************************************************************************!*\
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/Footer.vue?vue&type=template&id=5a5746b4& ***!
+  \************************************************************************************************************************************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -2793,16 +4505,16 @@ var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
-var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper"},[_c('h1',[_vm._v(_vm._s(_vm.content.title))]),_vm._v(" "),_c('p',[_vm._v(_vm._s(_vm.content.lastDescription))]),_vm._v(" "),_c('div',{staticClass:"storyMenu leftMenu sideMenu"},[_c('div',{staticClass:"sideMenu leftMenu",attrs:{"id":"leftMenu"}},[_c('div',{staticClass:"leftMenuTab menuTab storyMenuTab",on:{"click":function($event){return _vm.storyMenu()}}},[_c('i',{staticClass:"fas fa-feather-alt"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab beingsMenuTab",on:{"click":function($event){return _vm.beingsMenu()}}},[_c('i',{staticClass:"fas fa-skull"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab weaponryMenuTab",on:{"click":function($event){return _vm.weaponryMenu()}}},[_c('i',{staticClass:"fas fa-shield-alt"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab inventoryMenuTab",on:{"click":function($event){return _vm.inventoryMenu()}}},[_c('i',{staticClass:"fas fa-coins"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab portentsMenuTab",on:{"click":function($event){return _vm.portentsMenu()}}},[_c('i',{staticClass:"fas fa-hat-wizard"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab pantheonMenuTab",on:{"click":function($event){return _vm.pantheonMenu()}}},[_c('i',{staticClass:"fas fa-ankh"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab locationsMenuTab",on:{"click":function($event){return _vm.locationsMenu()}}},[_c('i',{staticClass:"fas fa-globe-europe"})]),_vm._v(" "),(_vm.menus === this.$store.state.worlds[_vm.chosenWorld].environment.plots)?_c('ul',[_c('li',{attrs:{"draggable":""},on:{"dragend":function($event){return _vm.addMainElement()},"click":function($event){return _vm.addMainElement()}}},[_c('img',{attrs:{"src":"https://www.gannett-cdn.com/media/2017/09/21/USATODAY/USATODAY/636415913442262218-GettyImages-481013807.jpg?width=1080&quality=50"}}),_vm._v("Main Plot\n        ")]),_vm._v(" "),_vm._l((_vm.menus),function(element,index){return _c('li',{key:index,attrs:{"draggable":""},on:{"dragend":function($event){return _vm.addElement(element)},"click":function($event){return _vm.addElement(element)}}},[_c('img',{attrs:{"src":_vm.portraitChooser(element)}}),_vm._v("\n          "+_vm._s(element.characterClass)+"\n        ")])})],2):_c('ul',_vm._l((_vm.menus),function(element,index){return _c('li',{key:index,attrs:{"draggable":""},on:{"dragend":function($event){return _vm.showElement(element)},"click":function($event){return _vm.showElement(element)}}},[_c('img',{attrs:{"src":_vm.portraitChooser(element)}}),_vm._v("\n          "+_vm._s(element.characterClass)+"\n        ")])}),0)])]),_vm._v(" "),(_vm.shown !== '')?_c('div',{staticClass:"loadedDisplayPanel"},[_c('h2',[_vm._v(_vm._s(_vm.shown.characterClass))]),_vm._v(" "),_c('div',{staticClass:"loadedDisplayContainer"},[_c('img',{attrs:{"src":_vm.portraitChooser(_vm.shown)}}),_vm._v(" "),_c('div',{staticClass:"description",domProps:{"innerHTML":_vm._s(_vm.shown.description)}})])]):(_vm.shown === '')?_c('div',{staticClass:"loadedDisplayPanel"},[_c('ul',_vm._l((_vm.$store.state.storyElements),function(storyElement,index){return _c('li',{key:index,staticClass:"storyBlock"},[_c('div',{staticClass:"storyRemoval",on:{"click":function($event){return _vm.removeStory(storyElement)}}},[_c('i',{staticClass:"fa fa-times"})]),_vm._v(" "),_c('div',{staticClass:"story",domProps:{"innerHTML":_vm._s(storyElement)}})])}),0)]):_vm._e(),_vm._v(" "),_c('div',{staticClass:"buttonContainer"},[_c('router-link',{attrs:{"tag":"button","to":"/encounter"}},[_vm._v("Go to Encounter")])],1)])}
+var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"footerSection"},[_c('div',{staticClass:"menuWrapper"},[_c('footer-menu')],1)])}
 var staticRenderFns = []
 
 
 
 /***/ }),
 
-/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Game.vue?vue&type=template&id=4f1d1f91&":
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Game.vue?vue&type=template&id=694bf0b0&":
 /*!**********************************************************************************************************************************************************************************************!*\
-  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/Game.vue?vue&type=template&id=4f1d1f91& ***!
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/Game.vue?vue&type=template&id=694bf0b0& ***!
   \**********************************************************************************************************************************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
@@ -2811,17 +4523,35 @@ var staticRenderFns = []
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
-var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper"},[_c('h1',[_vm._v("Game")]),_vm._v(" "),_c('ul',[_c('li',{on:{"click":function($event){return _vm.revealNew()}}},[_vm._v("New Game")]),_vm._v(" "),_c('li',{on:{"click":function($event){return _vm.revealLoad()}}},[_vm._v("Load Game")])]),_vm._v(" "),_c('div',{staticClass:"hidden",attrs:{"id":"newGameSection"}},[_c('h4',[_vm._v("New Game")]),_vm._v("Select what setting would you like to start your game in\n    "),_c('select',_vm._l((_vm.settingInfo),function(world,index){return _c('option',{key:index},[_vm._v(_vm._s(world.name))])}),0),_vm._v(" "),_vm._m(0),_vm._v(" "),_vm._m(1)]),_vm._v(" "),_c('div',{staticClass:"hidden",attrs:{"id":"loadGameSection"}},[_c('h4',[_vm._v("Load Game")]),_vm._v("Available games\n    "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.chosenGame.name),expression:"chosenGame.name"}],on:{"change":function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.$set(_vm.chosenGame, "name", $event.target.multiple ? $$selectedVal : $$selectedVal[0])}}},_vm._l((_vm.gamesInfo),function(game,index){return _c('option',{key:index,domProps:{"value":game.name}},[_vm._v(_vm._s(game.name))])}),0),_vm._v("\n    load: "+_vm._s(_vm.chosenGame.name)+"\n    "),_c('div',{staticClass:"buttonContainer"},_vm._l((_vm.nav),function(menu,index){return _c('router-link',{key:index,attrs:{"tag":"button","to":menu.route}},[_vm._v(_vm._s(menu.name))])}),1)])])}
+var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper"},[_c('h1',[_vm._v("Game")]),_vm._v(" "),_c('ul',[_c('li',{on:{"click":function($event){return _vm.revealNew()}}},[_vm._v("New Game")]),_vm._v(" "),_c('li',{on:{"click":function($event){return _vm.revealLoad()}}},[_vm._v("Load Game")])]),_vm._v(" "),_c('div',{staticClass:"hidden",attrs:{"id":"newGameSection"}},[_c('h4',[_vm._v("New Game")]),_vm._v("Select what setting would you like to start your game in\n    "),_c('select',_vm._l((_vm.settingInfo),function(world,index){return _c('option',{key:index},[_vm._v(_vm._s(world.name))])}),0),_vm._v(" "),_vm._m(0),_vm._v(" "),_vm._m(1)]),_vm._v(" "),_c('div',{staticClass:"hidden",attrs:{"id":"loadGameSection"}},[_c('h4',[_vm._v("Load Game")]),_vm._v("Available games\n    "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectedGame),expression:"selectedGame"}],on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectedGame=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){return _vm.populateGame(_vm.selectedGame)}]}},[_c('option',{attrs:{"disabled":"","selected":""}},[_vm._v("-- Choose your saved game --")]),_vm._v(" "),_vm._l((_vm.gamesInfo),function(game,index){return _c('option',{key:index,domProps:{"value":game.name}},[_vm._v(_vm._s(game.name))])})],2),_vm._v(" "),_c('div',{staticClass:"buttonContainer"},_vm._l((_vm.nav),function(menu,index){return _c('router-link',{key:index,attrs:{"tag":"button","to":menu.route}},[_vm._v(_vm._s(menu.name))])}),1)])])}
 var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',[_c('h5',[_vm._v("Enter New Campaign Title")]),_vm._v(" "),_c('input',{attrs:{"type":"text"}})])},function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"buttonContainer"},[_c('button',[_vm._v("Setup New Campaign")])])}]
 
 
 
 /***/ }),
 
-/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Home.vue?vue&type=template&id=31767952&":
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Home.vue?vue&type=template&id=7c10bb6e&":
 /*!**********************************************************************************************************************************************************************************************!*\
-  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/Home.vue?vue&type=template&id=31767952& ***!
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/Home.vue?vue&type=template&id=7c10bb6e& ***!
   \**********************************************************************************************************************************************************************************************/
+/*! exports provided: render, staticRenderFns */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
+var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',[_c('div',{staticClass:"mainBanner"},[_c('img',{attrs:{"src":_vm.pageBanner.image}}),_vm._v(" "),_c('div',{staticClass:"bannerText"},[_c('h1',[_vm._v(_vm._s(_vm.pageBanner.h1))]),_vm._v(" "),_c('h3',[_vm._v(_vm._s(_vm.pageBanner.h3))])]),_vm._v(" "),_c('div',{staticClass:"mainWrapper contentText",domProps:{"innerHTML":_vm._s(_vm.mainPageText)}})])])}
+var staticRenderFns = []
+
+
+
+/***/ }),
+
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/PrivacyPolicy.vue?vue&type=template&id=7280e2f8&":
+/*!*******************************************************************************************************************************************************************************************************!*\
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/PrivacyPolicy.vue?vue&type=template&id=7280e2f8& ***!
+  \*******************************************************************************************************************************************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -2830,7 +4560,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
 var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _vm._m(0)}
-var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper"},[_c('div',{staticClass:"mainBanner"},[_c('h1',[_vm._v("Home")]),_vm._v(" "),_c('h3',[_vm._v("Welcome to Grim Windmill")]),_vm._v(" "),_c('h4',[_vm._v("This application will allow Storytellers run tabletop Roleplaying games on the go, just by using this app on their mobile or tablet.")])])])}]
+var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper"},[_c('h1',[_vm._v("Privacy Policy")])])}]
 
 
 
@@ -2854,9 +4584,27 @@ var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _
 
 /***/ }),
 
-/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/EncElement.vue?vue&type=template&id=2b832382&":
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Tutorial.vue?vue&type=template&id=4ffde328&":
+/*!**************************************************************************************************************************************************************************************************!*\
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/Tutorial.vue?vue&type=template&id=4ffde328& ***!
+  \**************************************************************************************************************************************************************************************************/
+/*! exports provided: render, staticRenderFns */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
+var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _vm._m(0)}
+var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper"},[_c('h1',[_vm._v("Tutorial")])])}]
+
+
+
+/***/ }),
+
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/EncElement.vue?vue&type=template&id=0e717933&":
 /*!****************************************************************************************************************************************************************************************************************!*\
-  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/environment/EncElement.vue?vue&type=template&id=2b832382& ***!
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/environment/EncElement.vue?vue&type=template&id=0e717933& ***!
   \****************************************************************************************************************************************************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
@@ -2865,16 +4613,16 @@ var staticRenderFns = [function () {var _vm=this;var _h=_vm.$createElement;var _
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
-var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',[(_vm.character.type === 'creature')?_c('ul',{staticClass:"encounterStats"},[_c('li',[(_vm.character.portrait !== '')?_c('div',[_c('img',{attrs:{"src":_vm.character.portrait}})]):_c('div',[_c('img',{attrs:{"src":"https://awodev.com/images/default-forum-user.png"}})])]),_vm._v(" "),_c('li',[_vm._v("Class: "+_vm._s(_vm.character.characterClass))]),_vm._v(" "),_c('li',[_vm._v("Name: "+_vm._s(_vm.character.name)),(_vm.character.alias !== '')?_c('span',[_vm._v(" \""+_vm._s(_vm.character.alias)+"\"")]):_vm._e()]),_vm._v(" "),_c('li',[_vm._v("Gender: "+_vm._s(_vm.character.gender))]),_vm._v(" "),_c('li',{staticClass:"statBox"},[_c('ul',{staticClass:"statNames"},_vm._l((_vm.statNames),function(charName,indx){return _c('li',{key:indx},[_vm._v(_vm._s(charName.name))])}),0),_vm._v(" "),_c('ul',{staticClass:"statValues"},_vm._l((_vm.character.stats),function(char,i){return _c('li',{key:i},[_vm._v(_vm._s(char))])}),0)]),_vm._v(" "),_c('li',[_vm._v("MP: "+_vm._s(_vm.character.martialProwess))]),_vm._v(" "),_c('li',[_vm._v("DB: "+_vm._s(_vm.character.damageBonus))]),_vm._v(" "),_c('li',[_vm._v("DEF: "+_vm._s(_vm.character.defenseValue))]),_vm._v(" "),_c('li',[_vm._v("HP: "),_c('div',{staticClass:"hitpointsBar",style:({ width: (_vm.character.hitpoints * 2) + 'px'})},[_c('div',{staticClass:"tempHitpoints",style:({ width: (_vm.character.tempHitpoints * 2) + 'px'})}),_c('div',{staticClass:"tempHtpText"},[_vm._v(_vm._s(_vm.character.tempHitpoints))])]),_c('div',{on:{"click":function($event){_vm.character.tempHitpoints--}}},[_vm._v("Dmg")]),_vm._v(" "),_c('div',{on:{"click":function($event){_vm.character.tempHitpoints++}}},[_vm._v("Heal")])]),_vm._v(" "),_c('li',[_vm._v("Sanity: "),_c('div',{staticClass:"hitpointsBar",style:({ width: (_vm.character.sanity * 2) + 'px'})},[_c('div',{staticClass:"tempSanity",style:({ width: (_vm.character.tempSanity * 2) + 'px'})}),_c('div',{staticClass:"tempHtpText"},[_vm._v(_vm._s(_vm.character.tempSanity))])]),_c('div',{on:{"click":function($event){_vm.character.tempSainity--}}},[_vm._v("Dmg")]),_vm._v(" "),_c('div',{on:{"click":function($event){_vm.character.tempSanity++}}},[_vm._v("Heal")])]),_vm._v(" "),_c('li',[_vm._v("Charisma: "+_vm._s(_vm.character.charisma))])]):_c('ul',{staticClass:"encounterStats"},[_c('li',[(_vm.character.portrait !== '')?_c('div',[_c('img',{attrs:{"src":_vm.character.portrait}})]):_c('div',[_c('img',{attrs:{"src":"https://awodev.com/images/default-forum-user.png"}})])]),_vm._v(" "),_c('li',[_vm._v("Scene Encounter Type: "+_vm._s(_vm.character.name))]),_vm._v(" "),_c('li',{staticClass:"statBox"},[_c('ul',{staticClass:"statNames"},_vm._l((_vm.statNames),function(charName,indx){return _c('li',{key:indx},[_vm._v(_vm._s(charName.name))])}),0),_vm._v(" "),_c('ul',{staticClass:"statValues"},_vm._l((_vm.character.stats),function(char,i){return _c('li',{key:i},[_vm._v(_vm._s(char))])}),0)])]),_vm._v(" "),_c('div',{staticClass:"targetChoice",attrs:{"id":"targetChoice"}},[_vm._v("\n        Target:\n        "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectTarget),expression:"selectTarget"}],on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectTarget=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){return _vm.chooseTarget(_vm.selectTarget)}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Target --")]),_vm._v(" "),_vm._l((_vm.targets),function(target,index){return _c('option',{key:index},[_vm._v(_vm._s(target.name))])})],2)]),_vm._v(" "),(_vm.character.type === 'creature')?_c('div',{staticClass:"actionChoice",attrs:{"id":"actionChoice"}},[_vm._v("\n        Actions:\n        "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectAction),expression:"selectAction"}],attrs:{"id":"actionChoiceSelect"},on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectAction=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){_vm.chooseAction(_vm.targets.indexOf(_vm.character))}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Action --")]),_vm._v(" "),_vm._l((_vm.character.actions),function(action,index){return _c('option',{key:index},[_vm._v(_vm._s(action.name))])})],2)]):_vm._e(),_vm._v(" "),(_vm.character.characterType === 'pc')?_c('div',{staticClass:"actionChoice",attrs:{"id":"actionChoice"}},[_vm._v("\n        Class Actions:\n        "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectClassAction),expression:"selectClassAction"}],attrs:{"id":"actionChoiceSelect"},on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectClassAction=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){_vm.classAction(_vm.targets.indexOf(_vm.character))}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Class Action --")]),_vm._v(" "),_vm._l((_vm.character.classActions),function(action,index){return _c('option',{key:index},[_vm._v(_vm._s(action.name))])})],2)]):_vm._e(),_vm._v(" "),(_vm.character.type === 'creature')?_c('div',{staticClass:"weaponChoice",attrs:{"id":"weaponChoice"}},[_vm._v("\n        Weapon:\n        "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectWeapon),expression:"selectWeapon"}],on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectWeapon=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){return _vm.chooseWeapon(_vm.selectWeapon)}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Weapon --")]),_vm._v(" "),_vm._l((_vm.character.weapons),function(weapon,i){return _c('option',{key:i},[_vm._v(_vm._s(weapon.name))])})],2)]):_vm._e(),_vm._v(" "),_c('div',{staticClass:"rollButtonContainer"},[(_vm.character.type === 'creature')?_c('button',{staticClass:"rollButton",on:{"click":function($event){return _vm.universalCheck(_vm.attackValue, _vm.defenseValue)}}},[_vm._v("Roll")]):_c('button',{staticClass:"rollButton",on:{"click":function($event){return _vm.sceneryRun(_vm.selectedTarget[0].stats, _vm.character.saveDiff, _vm.character.saveStat, _vm.character.damage)}}},[_vm._v("Roll")])])])}
+var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',[(_vm.character.type === 'creature')?_c('ul',{staticClass:"encounterStats"},[_c('li',[(_vm.character.portrait !== '')?_c('div',[_c('img',{attrs:{"src":_vm.character.portrait}})]):_c('div',[_c('img',{attrs:{"src":"https://awodev.com/images/default-forum-user.png"}})])]),_vm._v(" "),_c('li',[_vm._v("Class: "+_vm._s(_vm.character.characterClass))]),_vm._v(" "),_c('li',[_vm._v("\n      Name: "+_vm._s(_vm.character.name)+"\n      "),(_vm.character.alias !== '')?_c('span',[_vm._v("\""+_vm._s(_vm.character.alias)+"\"")]):_vm._e()]),_vm._v(" "),_c('li',[_vm._v("Gender: "+_vm._s(_vm.character.gender))]),_vm._v(" "),_c('li',{staticClass:"statBox"},[_c('ul',{staticClass:"statNames"},_vm._l((_vm.statNames),function(charName,indx){return _c('li',{key:indx},[_vm._v(_vm._s(charName.name))])}),0),_vm._v(" "),_c('ul',{staticClass:"statValues"},_vm._l((_vm.character.stats),function(char,i){return _c('li',{key:i},[_vm._v(_vm._s(char))])}),0)]),_vm._v(" "),_c('li',{staticClass:"flexor"},[_c('div',{staticClass:"martialStats"},[_vm._v("\n        Martial Prowess:\n        "),_c('span',[_vm._v(_vm._s(_vm.character.martialProwess))])]),_vm._v(" "),_c('div',{staticClass:"martialStats"},[_vm._v("\n        Damage Bonus:\n        "),_c('span',[_vm._v(_vm._s(_vm.character.damageBonus))])]),_vm._v(" "),_c('div',{staticClass:"martialStats"},[_vm._v("\n        Defense/armor:\n        "),_c('span',[_vm._v(_vm._s(_vm.character.defenseValue))])])]),_vm._v(" "),_c('li',{staticClass:"flexCond"},[_c('div',{staticClass:"flexor statBar"},[_vm._v("\n        HP:\n        "),_c('div',{staticClass:"hitpointsBar",style:({ width: (_vm.character.hitpoints * 2) + 'px'})},[_c('div',{staticClass:"tempHitpoints",style:({ width: (_vm.character.tempHitpoints * 2) + 'px'})}),_vm._v(" "),_c('div',{staticClass:"tempHtpText"},[_vm._v(_vm._s(_vm.character.tempHitpoints))])]),_vm._v(" "),_c('div',{staticClass:"incDec",on:{"click":function($event){_vm.character.tempHitpoints--}}},[_vm._v("Dmg")]),_vm._v(" "),_c('div',{staticClass:"incDec",on:{"click":function($event){_vm.character.tempHitpoints++}}},[_vm._v("Heal")])]),_vm._v(" "),_c('div',{staticClass:"flexor statBar"},[_vm._v("\n        Sanity:\n        "),_c('div',{staticClass:"hitpointsBar",style:({ width: (_vm.character.sanity * 2) + 'px'})},[_c('div',{staticClass:"tempSanity",style:({ width: (_vm.character.tempSanity * 2) + 'px'})}),_vm._v(" "),_c('div',{staticClass:"tempHtpText"},[_vm._v(_vm._s(_vm.character.tempSanity))])]),_vm._v(" "),_c('div',{staticClass:"incDec",on:{"click":function($event){_vm.character.tempSanity--}}},[_vm._v("Dmg")]),_vm._v(" "),_c('div',{staticClass:"incDec",on:{"click":function($event){_vm.character.tempSanity++}}},[_vm._v("Heal")])])]),_vm._v(" "),_c('li',[_vm._v("Charisma: "+_vm._s(_vm.character.charisma))])]):_c('ul',{staticClass:"encounterStats"},[_c('li',[(_vm.character.portrait !== '')?_c('div',[_c('img',{attrs:{"src":_vm.character.portrait}})]):_c('div',[_c('img',{attrs:{"src":"https://awodev.com/images/default-forum-user.png"}})])]),_vm._v(" "),_c('li',[_vm._v("Scene Encounter Type: "+_vm._s(_vm.character.name))]),_vm._v(" "),_c('li',{staticClass:"statBox"},[_c('ul',{staticClass:"statNames"},_vm._l((_vm.statNames),function(charName,indx){return _c('li',{key:indx},[_vm._v(_vm._s(charName.name))])}),0),_vm._v(" "),_c('ul',{staticClass:"statValues"},_vm._l((_vm.character.stats),function(char,i){return _c('li',{key:i},[_vm._v(_vm._s(char))])}),0)])]),_vm._v(" "),_c('div',{staticClass:"targetChoice",attrs:{"id":"targetChoice"}},[_vm._v("\n    Target:\n    "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectTarget),expression:"selectTarget"}],on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectTarget=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){return _vm.chooseTarget(_vm.selectTarget)}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Target --")]),_vm._v(" "),_c('option',[_vm._v("Environment")]),_vm._v(" "),_vm._l((_vm.targets),function(target,index){return _c('option',{key:index},[_vm._v(_vm._s(target.name))])})],2)]),_vm._v(" "),(_vm.selectedTarget)?_c('div',[(_vm.character.characterType === 'pc')?_c('div',{staticClass:"actionChoice",attrs:{"id":"actionChoice"}},[_vm._v("\n      Class Actions:\n      "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectedClassAction),expression:"selectedClassAction"}],attrs:{"id":"actionChoiceSelect"},on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectedClassAction=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){_vm.classAction(_vm.targets.indexOf(_vm.character))}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Class Action --")]),_vm._v(" "),_vm._l((_vm.character.classActions),function(action,index){return _c('option',{key:index},[_vm._v(_vm._s(action.name))])})],2)]):_vm._e(),_vm._v(" "),(_vm.character.type === 'creature')?_c('div',{staticClass:"actionChoice",attrs:{"id":"actionChoice"}},[_vm._v("\n      Actions:\n      "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectAction),expression:"selectAction"}],attrs:{"id":"actionChoiceSelect"},on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectAction=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){_vm.chooseAction(_vm.targets.indexOf(_vm.character))}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Action --")]),_vm._v(" "),_vm._l((_vm.character.actions),function(action,index){return _c('option',{key:index},[_vm._v(_vm._s(action.name))])})],2)]):_vm._e(),_vm._v(" "),(_vm.character.type === 'creature')?_c('div',{staticClass:"weaponChoice"},[_vm._v("\n      Weapon:\n      "),_c('select',{directives:[{name:"model",rawName:"v-model",value:(_vm.selectWeapon),expression:"selectWeapon"}],on:{"change":[function($event){var $$selectedVal = Array.prototype.filter.call($event.target.options,function(o){return o.selected}).map(function(o){var val = "_value" in o ? o._value : o.value;return val}); _vm.selectWeapon=$event.target.multiple ? $$selectedVal : $$selectedVal[0]},function($event){return _vm.chooseWeapon(_vm.selectWeapon)}]}},[_c('option',{attrs:{"default":"","disabled":"","selected":""}},[_vm._v("-- Select Weapon --")]),_vm._v(" "),_vm._l((_vm.character.weapons),function(weapon,i){return _c('option',{key:i},[_vm._v(_vm._s(weapon.name))])})],2)]):_vm._e()]):_c('div'),_vm._v(" "),_c('div',{staticClass:"rollButtonContainer"},[(_vm.character.type === 'creature')?_c('button',{staticClass:"rollButton",on:{"click":function($event){return _vm.universalCheck(_vm.attackValue, _vm.defenseValue)}}},[_vm._v("Roll")]):_c('button',{staticClass:"rollButton",on:{"click":function($event){return _vm.sceneryRun(_vm.selectedTarget[0].stats, _vm.character.saveDiff, _vm.character.saveStat, _vm.character.damage)}}},[_vm._v("Roll")])])])}
 var staticRenderFns = []
 
 
 
 /***/ }),
 
-/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/Encounter.vue?vue&type=template&id=b92b5976&":
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/Encounter.vue?vue&type=template&id=3228fa83&":
 /*!***************************************************************************************************************************************************************************************************************!*\
-  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/environment/Encounter.vue?vue&type=template&id=b92b5976& ***!
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/environment/Encounter.vue?vue&type=template&id=3228fa83& ***!
   \***************************************************************************************************************************************************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
@@ -2883,16 +4631,16 @@ var staticRenderFns = []
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
-var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper"},[_c('h3',[_vm._v("Encounter:")]),_vm._v(" "),_c('ul',{staticClass:"encounterList",attrs:{"id":"encounterList"}},_vm._l((_vm.targets),function(character,index){return _c('li',{key:index,staticClass:"encounterElement",attrs:{"draggable":"true"}},[_c('div',{staticClass:"eElementRemoval",on:{"click":function($event){return _vm.removeFromRoster(character)}}},[_c('i',{staticClass:"fa fa-times"})]),_vm._v(" "),_c('encounter-Element',{attrs:{"character":character,"targets":_vm.targets,"statNames":_vm.statNames,"targetDefense":_vm.targetDefense}})],1)}),0),_vm._v(" "),_c('div',{staticClass:"menus"},[_c('h4',[_vm._v("Drag and drop to the screen to add to Roster")]),_vm._v(" "),_c('div',{staticClass:"sideMenu rightMenu",attrs:{"id":"rightMenu"}},[_c('div',{staticClass:"rightMenuTab menuTab npcMenuTab",on:{"click":function($event){return _vm.npcMenu()}}},[_c('i',{staticClass:"fas fa-user-plus"})]),_vm._v(" "),_c('div',{staticClass:"rightMenuTab menuTab monsterMenuTab",on:{"click":function($event){return _vm.monsterMenu()}}},[_c('i',{staticClass:"fas fa-dragon"})]),_vm._v(" "),_c('div',{staticClass:"rightMenuTab menuTab sceneryMenuTab",on:{"click":function($event){return _vm.sceneryMenu()}}},[_c('i',{staticClass:"fas fa-dungeon"})]),_vm._v(" "),(_vm.creatures)?_c('ul',_vm._l((_vm.encounter),function(target,index){return _c('li',{key:index,attrs:{"draggable":""},on:{"dragend":function($event){return _vm.addTarget(target)},"click":function($event){return _vm.addTarget(target)}}},[_c('img',{attrs:{"src":_vm.portraitChooser(target)}}),_vm._v(" "),_c('p',[_vm._v(_vm._s(target.characterClass))])])}),0):_c('ul',_vm._l((_vm.scenery),function(target,index){return _c('li',{key:index,attrs:{"draggable":""},on:{"dragend":function($event){return _vm.addTarget(target)},"click":function($event){return _vm.addTarget(target)}}},[_c('img',{attrs:{"src":target.portrait}}),_vm._v(" "),_c('p',[_vm._v(_vm._s(target.name))])])}),0)])]),_vm._v(" "),_c('div',{staticClass:"buttonContainer"},[_c('button',{on:{"click":function($event){return _vm.randomizeOrder(_vm.targets)}}},[_vm._v("Randomize initiative")]),_vm._v(" "),_c('router-link',{attrs:{"tag":"button","to":"/loaded"}},[_vm._v("Back to Loaded")])],1),_vm._v(" "),_c('div',{staticClass:"modalOverlay",attrs:{"id":"modalOverlay"}},[_c('div',{staticClass:"rollModal"},[_c('h4',[_vm._v("Roll result:")]),_vm._v(" "),_c('div',{staticClass:"d20"},[_c('h3',[_vm._v(_vm._s(_vm.$store.state.rollResult))])]),_vm._v(" "),_c('h4',[_vm._v(_vm._s(_vm.$store.state.resultMessage))]),_vm._v(" "),_c('div',{staticClass:"closeModal",on:{"click":function($event){return _vm.closeModal()}}},[_c('i',{staticClass:"fa fa-times"})])])])])}
+var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper"},[_c('h3',[_vm._v("Encounter:")]),_vm._v(" "),_c('ul',{staticClass:"encounterList",attrs:{"id":"encounterList"}},_vm._l((_vm.targets),function(character,index){return _c('li',{key:index,staticClass:"encounterElement",attrs:{"draggable":"true"}},[_c('div',{staticClass:"eElementRemoval",on:{"click":function($event){return _vm.removeFromRoster(character)}}},[_c('i',{staticClass:"fa fa-times"})]),_vm._v(" "),_c('encounter-Element',{attrs:{"character":character,"targets":_vm.targets,"statNames":_vm.statNames,"targetDefense":_vm.targetDefense}})],1)}),0),_vm._v(" "),_c('div',{staticClass:"menus"},[_c('h4',[_vm._v("Drag and drop to the screen to add to Roster")]),_vm._v(" "),_c('div',{staticClass:"sideMenu rightMenu",attrs:{"id":"rightMenu"}},[_c('div',{staticClass:"rightMenuTab menuTab npcMenuTab",on:{"click":function($event){return _vm.npcMenu()}}},[_c('i',{staticClass:"fas fa-user-plus"})]),_vm._v(" "),_c('div',{staticClass:"rightMenuTab menuTab monsterMenuTab",on:{"click":function($event){return _vm.monsterMenu()}}},[_c('i',{staticClass:"fas fa-dragon"})]),_vm._v(" "),_c('div',{staticClass:"rightMenuTab menuTab sceneryMenuTab",on:{"click":function($event){return _vm.sceneryMenu()}}},[_c('i',{staticClass:"fas fa-dungeon"})]),_vm._v(" "),(_vm.creatures)?_c('ul',_vm._l((_vm.encounter),function(target,index){return _c('li',{key:index,attrs:{"draggable":""},on:{"dragend":function($event){return _vm.addTarget(target)},"click":function($event){return _vm.addTarget(target)}}},[_c('img',{attrs:{"src":_vm.portraitChooser(target)}}),_vm._v(" "),_c('p',[_vm._v(_vm._s(target.characterClass))])])}),0):_c('ul',_vm._l((_vm.scenery),function(target,index){return _c('li',{key:index,attrs:{"draggable":""},on:{"dragend":function($event){return _vm.addTarget(target)},"click":function($event){return _vm.addTarget(target)}}},[_c('img',{attrs:{"src":target.portrait}}),_vm._v(" "),_c('p',[_vm._v(_vm._s(target.name))])])}),0)])]),_vm._v(" "),_c('div',{staticClass:"buttonContainer"},[_c('button',{on:{"click":function($event){return _vm.randomizeOrder(_vm.targets)}}},[_vm._v("Randomize initiative")]),_vm._v(" "),_c('router-link',{attrs:{"tag":"button","to":"/loaded"}},[_vm._v("Back to Loaded")]),_vm._v(" "),_c('button',{on:{"click":function($event){return _vm.saveCharacters(_vm.targets)}}},[_vm._v("Save Characters")])],1),_vm._v(" "),_c('div',{staticClass:"modalOverlay",attrs:{"id":"modalOverlay"}},[_c('div',{staticClass:"rollModal"},[_c('h4',[_vm._v("Roll result:")]),_vm._v(" "),_c('div',{staticClass:"d20"},[_c('h3',[_vm._v(_vm._s(_vm.$store.state.rollResult))])]),_vm._v(" "),_c('h4',[_vm._v(_vm._s(_vm.$store.state.resultMessage))]),_vm._v(" "),_c('div',{staticClass:"closeModal",on:{"click":function($event){return _vm.closeModal()}}},[_c('i',{staticClass:"fa fa-times"})])])])])}
 var staticRenderFns = []
 
 
 
 /***/ }),
 
-/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/Loaded.vue?vue&type=template&id=5abc59da&":
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/Loaded.vue?vue&type=template&id=6c79262e&":
 /*!************************************************************************************************************************************************************************************************************!*\
-  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/environment/Loaded.vue?vue&type=template&id=5abc59da& ***!
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/environment/Loaded.vue?vue&type=template&id=6c79262e& ***!
   \************************************************************************************************************************************************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
@@ -2901,16 +4649,34 @@ var staticRenderFns = []
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
-var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper"},[_c('h1',[_vm._v(_vm._s(_vm.content.title))]),_vm._v(" "),_c('p',[_vm._v(_vm._s(_vm.content.lastDescription))]),_vm._v(" "),_c('div',{staticClass:"storyMenu leftMenu sideMenu"},[_c('div',{staticClass:"sideMenu leftMenu",attrs:{"id":"leftMenu"}},[_c('div',{staticClass:"leftMenuTab menuTab storyMenuTab",on:{"click":function($event){return _vm.storyMenu()}}},[_c('i',{staticClass:"fas fa-feather-alt"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab beingsMenuTab",on:{"click":function($event){return _vm.beingsMenu()}}},[_c('i',{staticClass:"fas fa-skull"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab weaponryMenuTab",on:{"click":function($event){return _vm.weaponryMenu()}}},[_c('i',{staticClass:"fas fa-shield-alt"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab inventoryMenuTab",on:{"click":function($event){return _vm.inventoryMenu()}}},[_c('i',{staticClass:"fas fa-coins"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab portentsMenuTab",on:{"click":function($event){return _vm.portentsMenu()}}},[_c('i',{staticClass:"fas fa-hat-wizard"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab pantheonMenuTab",on:{"click":function($event){return _vm.pantheonMenu()}}},[_c('i',{staticClass:"fas fa-ankh"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab locationsMenuTab",on:{"click":function($event){return _vm.locationsMenu()}}},[_c('i',{staticClass:"fas fa-globe-europe"})]),_vm._v(" "),(_vm.menus === this.$store.state.worlds[_vm.chosenWorld].environment.plots)?_c('ul',[_c('li',{attrs:{"draggable":""},on:{"dragend":function($event){return _vm.addMainElement()},"click":function($event){return _vm.addMainElement()}}},[_c('img',{attrs:{"src":"https://www.gannett-cdn.com/media/2017/09/21/USATODAY/USATODAY/636415913442262218-GettyImages-481013807.jpg?width=1080&quality=50"}}),_vm._v("Main Plot\n        ")]),_vm._v(" "),_vm._l((_vm.menus),function(element,index){return _c('li',{key:index,attrs:{"draggable":""},on:{"dragend":function($event){return _vm.addElement(element)},"click":function($event){return _vm.addElement(element)}}},[_c('img',{attrs:{"src":_vm.portraitChooser(element)}}),_vm._v("\n          "+_vm._s(element.characterClass)+"\n        ")])})],2):_c('ul',_vm._l((_vm.menus),function(element,index){return _c('li',{key:index,attrs:{"draggable":""},on:{"dragend":function($event){return _vm.showElement(element)},"click":function($event){return _vm.showElement(element)}}},[_c('img',{attrs:{"src":_vm.portraitChooser(element)}}),_vm._v("\n          "+_vm._s(element.characterClass)+"\n        ")])}),0)])]),_vm._v(" "),(_vm.shown !== '')?_c('div',{staticClass:"loadedDisplayPanel"},[_c('h2',[_vm._v(_vm._s(_vm.shown.characterClass))]),_vm._v(" "),_c('div',{staticClass:"loadedDisplayContainer"},[_c('img',{attrs:{"src":_vm.portraitChooser(_vm.shown)}}),_vm._v(" "),_c('div',{staticClass:"description",domProps:{"innerHTML":_vm._s(_vm.shown.description)}})])]):(_vm.shown === '')?_c('div',{staticClass:"loadedDisplayPanel"},[_c('ul',_vm._l((_vm.$store.state.storyElements),function(storyElement,index){return _c('li',{key:index,staticClass:"storyBlock"},[_c('div',{staticClass:"storyRemoval",on:{"click":function($event){return _vm.removeStory(storyElement)}}},[_c('i',{staticClass:"fa fa-times"})]),_vm._v(" "),_c('div',{staticClass:"story",domProps:{"innerHTML":_vm._s(storyElement)}})])}),0)]):_vm._e(),_vm._v(" "),_c('div',{staticClass:"buttonContainer"},[_c('router-link',{attrs:{"tag":"button","to":"/encounter"}},[_vm._v("Go to Encounter")])],1)])}
+var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper"},[_c('h1',[_vm._v(_vm._s(_vm.content.title))]),_vm._v(" "),_c('p',[_vm._v(_vm._s(_vm.content.lastDescription))]),_vm._v(" "),_c('div',{staticClass:"storyMenu leftMenu sideMenu"},[_c('div',{staticClass:"sideMenu leftMenu",attrs:{"id":"leftMenu"}},[_c('div',{staticClass:"leftMenuTab menuTab storyMenuTab",on:{"click":function($event){return _vm.storyMenu()}}},[_c('i',{staticClass:"fas fa-feather-alt"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab beingsMenuTab",on:{"click":function($event){return _vm.beingsMenu()}}},[_c('i',{staticClass:"fas fa-skull"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab weaponryMenuTab",on:{"click":function($event){return _vm.weaponryMenu()}}},[_c('i',{staticClass:"fas fa-shield-alt"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab inventoryMenuTab",on:{"click":function($event){return _vm.inventoryMenu()}}},[_c('i',{staticClass:"fas fa-coins"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab portentsMenuTab",on:{"click":function($event){return _vm.portentsMenu()}}},[_c('i',{staticClass:"fas fa-hat-wizard"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab pantheonMenuTab",on:{"click":function($event){return _vm.pantheonMenu()}}},[_c('i',{staticClass:"fas fa-ankh"})]),_vm._v(" "),_c('div',{staticClass:"leftMenuTab menuTab locationsMenuTab",on:{"click":function($event){return _vm.locationsMenu()}}},[_c('i',{staticClass:"fas fa-globe-europe"})]),_vm._v(" "),(_vm.menus === this.$store.state.worlds[_vm.chosenWorld].environment.plots)?_c('ul',[_c('li',{attrs:{"draggable":""},on:{"dragend":function($event){return _vm.addMainElement()},"click":function($event){return _vm.addMainElement()}}},[_c('img',{attrs:{"src":"https://www.gannett-cdn.com/media/2017/09/21/USATODAY/USATODAY/636415913442262218-GettyImages-481013807.jpg?width=1080&quality=50"}}),_vm._v("Main Plot\n        ")]),_vm._v(" "),_vm._l((_vm.menus),function(element,index){return _c('li',{key:index,attrs:{"draggable":""},on:{"dragend":function($event){return _vm.addElement(element)},"click":function($event){return _vm.addElement(element)}}},[_c('img',{attrs:{"src":_vm.portraitChooser(element)}}),_vm._v("\n          "+_vm._s(element.characterClass)+"\n        ")])})],2):_c('ul',_vm._l((_vm.menus),function(element,index){return _c('li',{key:index,attrs:{"draggable":""},on:{"dragend":function($event){return _vm.showElement(element)},"click":function($event){return _vm.showElement(element)}}},[_c('img',{attrs:{"src":_vm.portraitChooser(element)}}),_vm._v("\n          "+_vm._s(element.characterClass)+"\n        ")])}),0)])]),_vm._v(" "),(_vm.story === '')?_c('div',{staticClass:"contentText"},[_c('h2',[_vm._v("This is the Story Panel")]),_vm._v(" "),_c('h4',[_vm._v("On the left hand side you will find some tags with certain symbols that will allow you to build the adventure you want to tell.")]),_vm._v(" "),_c('p',[_vm._v("The left menu has the following options, in descending order: Plot Menu, Bestiary, Gear Info Menu, Supplies Menu, Incantations Menu, Pantheon Menu and Locations Menu.")]),_vm._v(" "),_c('p',[_vm._v("The plot menu will allow you to automatically generate either a Main plot or a minor local plot. Main plots are world ending scenarios and serve as the column, more relevant than all the other plots put together. Failing to complete this challenge will change the world as we know it in dramatic ways (we advise not to just blow the whole thing up, as you can build on the challenging ashes of a dystopian future). Minor plots are stories that may or may not be related to the main plot but are simpler, more familiar quests. We strongly believe that a great campaign is a mixture of both.")]),_vm._v(" "),_c('p',[_vm._v("Click or drag the elements you want to see or add to the story.")]),_vm._v(" "),_c('p',[_vm._v("the Bestiary, Gear, Inventory, Incantations and Pantheon menus offer info and prices on goods or supernatural and divine manifestations. The Locations menu will randomly supply with a layout for a location, with suggestions on what npcs, creatures or environmental hazards could be involved in them.")])]):_c('div',[(_vm.shown !== '')?_c('div',{staticClass:"loadedDisplayPanel"},[_c('h2',[_vm._v(_vm._s(_vm.shown.characterClass))]),_vm._v(" "),_c('div',{staticClass:"loadedDisplayContainer"},[_c('img',{attrs:{"src":_vm.portraitChooser(_vm.shown)}}),_vm._v(" "),_c('div',{staticClass:"description",domProps:{"innerHTML":_vm._s(_vm.shown.description)}})])]):_vm._e(),_vm._v(" "),(_vm.shown === '')?_c('div',{staticClass:"loadedDisplayPanel"},[_c('ul',_vm._l((_vm.$store.state.storyElements),function(storyElement,index){return _c('li',{key:index,staticClass:"storyBlock"},[_c('div',{staticClass:"storyRemoval",on:{"click":function($event){return _vm.removeStory(storyElement)}}},[_c('i',{staticClass:"fa fa-times"})]),_vm._v(" "),_c('div',{staticClass:"story",domProps:{"innerHTML":_vm._s(storyElement)}})])}),0)]):_vm._e()]),_vm._v(" "),_c('div',{staticClass:"buttonContainer"},[_c('router-link',{attrs:{"tag":"button","to":"/encounter"}},[_vm._v("Go to Encounter")])],1)])}
 var staticRenderFns = []
 
 
 
 /***/ }),
 
-/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/menus/MainMenu.vue?vue&type=template&id=b50e0fd4&":
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/menus/FooterMenu.vue?vue&type=template&id=934069b0&":
+/*!**********************************************************************************************************************************************************************************************************!*\
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/menus/FooterMenu.vue?vue&type=template&id=934069b0& ***!
+  \**********************************************************************************************************************************************************************************************************/
+/*! exports provided: render, staticRenderFns */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
+var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"menuWrapper"},[_c('ul',{staticClass:"mainNav"},_vm._l((_vm.mainmenu),function(menu,index){return _c('router-link',{key:index,staticClass:"menuLink",attrs:{"tag":"li","to":menu.route}},[_vm._v(_vm._s(menu.name))])}),1)])}
+var staticRenderFns = []
+
+
+
+/***/ }),
+
+/***/ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/menus/MainMenu.vue?vue&type=template&id=1f298990&":
 /*!********************************************************************************************************************************************************************************************************!*\
-  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/menus/MainMenu.vue?vue&type=template&id=b50e0fd4& ***!
+  !*** ./node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!./node_modules/vue-loader/lib??vue-loader-options!./src/components/menus/MainMenu.vue?vue&type=template&id=1f298990& ***!
   \********************************************************************************************************************************************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
@@ -2919,7 +4685,7 @@ var staticRenderFns = []
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "render", function() { return render; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return staticRenderFns; });
-var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"mainWrapper"},[_c('ul',{staticClass:"mainNav"},[_vm._l((_vm.mainmenu),function(menu,index){return _c('router-link',{key:index,staticClass:"menuLink",attrs:{"tag":"li","to":menu.route}},[_vm._v(_vm._s(menu.name))])}),_vm._v(" "),_c('div',{staticClass:"menuLink",on:{"click":function($event){return _vm.loadLogin()}}},[_vm._v("Login/Register")])],2)])}
+var render = function () {var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('div',{staticClass:"menuWrapper"},[_c('ul',{staticClass:"mainNav"},[_vm._l((_vm.mainmenu),function(menu,index){return _c('router-link',{key:index,staticClass:"menuLink",attrs:{"tag":"li","to":menu.route}},[_vm._v(_vm._s(menu.name))])}),_vm._v(" "),_c('div',{staticClass:"menuLink",on:{"click":function($event){return _vm.loadLogin()}}},[_vm._v("Login/Register")])],2)])}
 var staticRenderFns = []
 
 
@@ -17691,7 +19457,7 @@ module.exports = g;
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _App_vue_vue_type_template_id_2103f570___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./App.vue?vue&type=template&id=2103f570& */ "./src/App.vue?vue&type=template&id=2103f570&");
+/* harmony import */ var _App_vue_vue_type_template_id_5c87d7e8___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./App.vue?vue&type=template&id=5c87d7e8& */ "./src/App.vue?vue&type=template&id=5c87d7e8&");
 /* harmony import */ var _App_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./App.vue?vue&type=script&lang=js& */ "./src/App.vue?vue&type=script&lang=js&");
 /* empty/unused harmony star reexport *//* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
 
@@ -17703,8 +19469,8 @@ __webpack_require__.r(__webpack_exports__);
 
 var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__["default"])(
   _App_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__["default"],
-  _App_vue_vue_type_template_id_2103f570___WEBPACK_IMPORTED_MODULE_0__["render"],
-  _App_vue_vue_type_template_id_2103f570___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  _App_vue_vue_type_template_id_5c87d7e8___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _App_vue_vue_type_template_id_5c87d7e8___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
   false,
   null,
   null,
@@ -17730,19 +19496,19 @@ __webpack_require__.r(__webpack_exports__);
 
 /***/ }),
 
-/***/ "./src/App.vue?vue&type=template&id=2103f570&":
+/***/ "./src/App.vue?vue&type=template&id=5c87d7e8&":
 /*!****************************************************!*\
-  !*** ./src/App.vue?vue&type=template&id=2103f570& ***!
+  !*** ./src/App.vue?vue&type=template&id=5c87d7e8& ***!
   \****************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_App_vue_vue_type_template_id_2103f570___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../node_modules/vue-loader/lib??vue-loader-options!./App.vue?vue&type=template&id=2103f570& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/App.vue?vue&type=template&id=2103f570&");
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_App_vue_vue_type_template_id_2103f570___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_App_vue_vue_type_template_id_5c87d7e8___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../node_modules/vue-loader/lib??vue-loader-options!./App.vue?vue&type=template&id=5c87d7e8& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/App.vue?vue&type=template&id=5c87d7e8&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_App_vue_vue_type_template_id_5c87d7e8___WEBPACK_IMPORTED_MODULE_0__["render"]; });
 
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_App_vue_vue_type_template_id_2103f570___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_App_vue_vue_type_template_id_5c87d7e8___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
 
 
 
@@ -17757,7 +19523,7 @@ __webpack_require__.r(__webpack_exports__);
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _About_vue_vue_type_template_id_316af4aa___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./About.vue?vue&type=template&id=316af4aa& */ "./src/components/About.vue?vue&type=template&id=316af4aa&");
+/* harmony import */ var _About_vue_vue_type_template_id_b3f6b2b4___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./About.vue?vue&type=template&id=b3f6b2b4& */ "./src/components/About.vue?vue&type=template&id=b3f6b2b4&");
 /* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
 
 var script = {}
@@ -17767,8 +19533,8 @@ var script = {}
 
 var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_1__["default"])(
   script,
-  _About_vue_vue_type_template_id_316af4aa___WEBPACK_IMPORTED_MODULE_0__["render"],
-  _About_vue_vue_type_template_id_316af4aa___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  _About_vue_vue_type_template_id_b3f6b2b4___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _About_vue_vue_type_template_id_b3f6b2b4___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
   false,
   null,
   null,
@@ -17780,19 +19546,69 @@ var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_
 
 /***/ }),
 
-/***/ "./src/components/About.vue?vue&type=template&id=316af4aa&":
+/***/ "./src/components/About.vue?vue&type=template&id=b3f6b2b4&":
 /*!*****************************************************************!*\
-  !*** ./src/components/About.vue?vue&type=template&id=316af4aa& ***!
+  !*** ./src/components/About.vue?vue&type=template&id=b3f6b2b4& ***!
   \*****************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_About_vue_vue_type_template_id_316af4aa___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../node_modules/vue-loader/lib??vue-loader-options!./About.vue?vue&type=template&id=316af4aa& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/About.vue?vue&type=template&id=316af4aa&");
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_About_vue_vue_type_template_id_316af4aa___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_About_vue_vue_type_template_id_b3f6b2b4___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../node_modules/vue-loader/lib??vue-loader-options!./About.vue?vue&type=template&id=b3f6b2b4& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/About.vue?vue&type=template&id=b3f6b2b4&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_About_vue_vue_type_template_id_b3f6b2b4___WEBPACK_IMPORTED_MODULE_0__["render"]; });
 
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_About_vue_vue_type_template_id_316af4aa___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_About_vue_vue_type_template_id_b3f6b2b4___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+
+
+
+/***/ }),
+
+/***/ "./src/components/Advice.vue":
+/*!***********************************!*\
+  !*** ./src/components/Advice.vue ***!
+  \***********************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _Advice_vue_vue_type_template_id_241ffe40___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Advice.vue?vue&type=template&id=241ffe40& */ "./src/components/Advice.vue?vue&type=template&id=241ffe40&");
+/* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
+
+var script = {}
+
+
+/* normalize component */
+
+var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_1__["default"])(
+  script,
+  _Advice_vue_vue_type_template_id_241ffe40___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _Advice_vue_vue_type_template_id_241ffe40___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  false,
+  null,
+  null,
+  null
+  
+)
+
+/* harmony default export */ __webpack_exports__["default"] = (component.exports);
+
+/***/ }),
+
+/***/ "./src/components/Advice.vue?vue&type=template&id=241ffe40&":
+/*!******************************************************************!*\
+  !*** ./src/components/Advice.vue?vue&type=template&id=241ffe40& ***!
+  \******************************************************************/
+/*! exports provided: render, staticRenderFns */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Advice_vue_vue_type_template_id_241ffe40___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../node_modules/vue-loader/lib??vue-loader-options!./Advice.vue?vue&type=template&id=241ffe40& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Advice.vue?vue&type=template&id=241ffe40&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Advice_vue_vue_type_template_id_241ffe40___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Advice_vue_vue_type_template_id_241ffe40___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
 
 
 
@@ -17807,7 +19623,7 @@ __webpack_require__.r(__webpack_exports__);
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _CCreation_vue_vue_type_template_id_5b6533a7___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CCreation.vue?vue&type=template&id=5b6533a7& */ "./src/components/CCreation.vue?vue&type=template&id=5b6533a7&");
+/* harmony import */ var _CCreation_vue_vue_type_template_id_9f133972___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CCreation.vue?vue&type=template&id=9f133972& */ "./src/components/CCreation.vue?vue&type=template&id=9f133972&");
 /* harmony import */ var _CCreation_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./CCreation.vue?vue&type=script&lang=js& */ "./src/components/CCreation.vue?vue&type=script&lang=js&");
 /* empty/unused harmony star reexport *//* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
 
@@ -17819,8 +19635,8 @@ __webpack_require__.r(__webpack_exports__);
 
 var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__["default"])(
   _CCreation_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__["default"],
-  _CCreation_vue_vue_type_template_id_5b6533a7___WEBPACK_IMPORTED_MODULE_0__["render"],
-  _CCreation_vue_vue_type_template_id_5b6533a7___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  _CCreation_vue_vue_type_template_id_9f133972___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _CCreation_vue_vue_type_template_id_9f133972___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
   false,
   null,
   null,
@@ -17846,19 +19662,19 @@ __webpack_require__.r(__webpack_exports__);
 
 /***/ }),
 
-/***/ "./src/components/CCreation.vue?vue&type=template&id=5b6533a7&":
+/***/ "./src/components/CCreation.vue?vue&type=template&id=9f133972&":
 /*!*********************************************************************!*\
-  !*** ./src/components/CCreation.vue?vue&type=template&id=5b6533a7& ***!
+  !*** ./src/components/CCreation.vue?vue&type=template&id=9f133972& ***!
   \*********************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_CCreation_vue_vue_type_template_id_5b6533a7___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../node_modules/vue-loader/lib??vue-loader-options!./CCreation.vue?vue&type=template&id=5b6533a7& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/CCreation.vue?vue&type=template&id=5b6533a7&");
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_CCreation_vue_vue_type_template_id_5b6533a7___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_CCreation_vue_vue_type_template_id_9f133972___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../node_modules/vue-loader/lib??vue-loader-options!./CCreation.vue?vue&type=template&id=9f133972& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/CCreation.vue?vue&type=template&id=9f133972&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_CCreation_vue_vue_type_template_id_9f133972___WEBPACK_IMPORTED_MODULE_0__["render"]; });
 
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_CCreation_vue_vue_type_template_id_5b6533a7___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_CCreation_vue_vue_type_template_id_9f133972___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
 
 
 
@@ -17914,17 +19730,17 @@ __webpack_require__.r(__webpack_exports__);
 
 /***/ }),
 
-/***/ "./src/components/Demo.vue":
-/*!*********************************!*\
-  !*** ./src/components/Demo.vue ***!
-  \*********************************/
+/***/ "./src/components/Footer.vue":
+/*!***********************************!*\
+  !*** ./src/components/Footer.vue ***!
+  \***********************************/
 /*! exports provided: default */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _Demo_vue_vue_type_template_id_78923ea6___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Demo.vue?vue&type=template&id=78923ea6& */ "./src/components/Demo.vue?vue&type=template&id=78923ea6&");
-/* harmony import */ var _Demo_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Demo.vue?vue&type=script&lang=js& */ "./src/components/Demo.vue?vue&type=script&lang=js&");
+/* harmony import */ var _Footer_vue_vue_type_template_id_5a5746b4___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Footer.vue?vue&type=template&id=5a5746b4& */ "./src/components/Footer.vue?vue&type=template&id=5a5746b4&");
+/* harmony import */ var _Footer_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Footer.vue?vue&type=script&lang=js& */ "./src/components/Footer.vue?vue&type=script&lang=js&");
 /* empty/unused harmony star reexport *//* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
 
 
@@ -17934,9 +19750,9 @@ __webpack_require__.r(__webpack_exports__);
 /* normalize component */
 
 var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__["default"])(
-  _Demo_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__["default"],
-  _Demo_vue_vue_type_template_id_78923ea6___WEBPACK_IMPORTED_MODULE_0__["render"],
-  _Demo_vue_vue_type_template_id_78923ea6___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  _Footer_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__["default"],
+  _Footer_vue_vue_type_template_id_5a5746b4___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _Footer_vue_vue_type_template_id_5a5746b4___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
   false,
   null,
   null,
@@ -17948,33 +19764,33 @@ var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_
 
 /***/ }),
 
-/***/ "./src/components/Demo.vue?vue&type=script&lang=js&":
-/*!**********************************************************!*\
-  !*** ./src/components/Demo.vue?vue&type=script&lang=js& ***!
-  \**********************************************************/
+/***/ "./src/components/Footer.vue?vue&type=script&lang=js&":
+/*!************************************************************!*\
+  !*** ./src/components/Footer.vue?vue&type=script&lang=js& ***!
+  \************************************************************/
 /*! exports provided: default */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _node_modules_babel_loader_lib_index_js_node_modules_vue_loader_lib_index_js_vue_loader_options_Demo_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/babel-loader/lib!../../node_modules/vue-loader/lib??vue-loader-options!./Demo.vue?vue&type=script&lang=js& */ "./node_modules/babel-loader/lib/index.js!./node_modules/vue-loader/lib/index.js?!./src/components/Demo.vue?vue&type=script&lang=js&");
-/* empty/unused harmony star reexport */ /* harmony default export */ __webpack_exports__["default"] = (_node_modules_babel_loader_lib_index_js_node_modules_vue_loader_lib_index_js_vue_loader_options_Demo_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_0__["default"]); 
+/* harmony import */ var _node_modules_babel_loader_lib_index_js_node_modules_vue_loader_lib_index_js_vue_loader_options_Footer_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/babel-loader/lib!../../node_modules/vue-loader/lib??vue-loader-options!./Footer.vue?vue&type=script&lang=js& */ "./node_modules/babel-loader/lib/index.js!./node_modules/vue-loader/lib/index.js?!./src/components/Footer.vue?vue&type=script&lang=js&");
+/* empty/unused harmony star reexport */ /* harmony default export */ __webpack_exports__["default"] = (_node_modules_babel_loader_lib_index_js_node_modules_vue_loader_lib_index_js_vue_loader_options_Footer_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_0__["default"]); 
 
 /***/ }),
 
-/***/ "./src/components/Demo.vue?vue&type=template&id=78923ea6&":
-/*!****************************************************************!*\
-  !*** ./src/components/Demo.vue?vue&type=template&id=78923ea6& ***!
-  \****************************************************************/
+/***/ "./src/components/Footer.vue?vue&type=template&id=5a5746b4&":
+/*!******************************************************************!*\
+  !*** ./src/components/Footer.vue?vue&type=template&id=5a5746b4& ***!
+  \******************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Demo_vue_vue_type_template_id_78923ea6___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../node_modules/vue-loader/lib??vue-loader-options!./Demo.vue?vue&type=template&id=78923ea6& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Demo.vue?vue&type=template&id=78923ea6&");
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Demo_vue_vue_type_template_id_78923ea6___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Footer_vue_vue_type_template_id_5a5746b4___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../node_modules/vue-loader/lib??vue-loader-options!./Footer.vue?vue&type=template&id=5a5746b4& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Footer.vue?vue&type=template&id=5a5746b4&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Footer_vue_vue_type_template_id_5a5746b4___WEBPACK_IMPORTED_MODULE_0__["render"]; });
 
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Demo_vue_vue_type_template_id_78923ea6___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Footer_vue_vue_type_template_id_5a5746b4___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
 
 
 
@@ -17989,11 +19805,9 @@ __webpack_require__.r(__webpack_exports__);
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _Game_vue_vue_type_template_id_4f1d1f91___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Game.vue?vue&type=template&id=4f1d1f91& */ "./src/components/Game.vue?vue&type=template&id=4f1d1f91&");
+/* harmony import */ var _Game_vue_vue_type_template_id_694bf0b0___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Game.vue?vue&type=template&id=694bf0b0& */ "./src/components/Game.vue?vue&type=template&id=694bf0b0&");
 /* harmony import */ var _Game_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Game.vue?vue&type=script&lang=js& */ "./src/components/Game.vue?vue&type=script&lang=js&");
-/* empty/unused harmony star reexport *//* harmony import */ var _Game_vue_vue_type_style_index_0_lang_scss___WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./Game.vue?vue&type=style&index=0&lang=scss& */ "./src/components/Game.vue?vue&type=style&index=0&lang=scss&");
-/* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
-
+/* empty/unused harmony star reexport *//* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
 
 
 
@@ -18001,10 +19815,10 @@ __webpack_require__.r(__webpack_exports__);
 
 /* normalize component */
 
-var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_3__["default"])(
+var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__["default"])(
   _Game_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__["default"],
-  _Game_vue_vue_type_template_id_4f1d1f91___WEBPACK_IMPORTED_MODULE_0__["render"],
-  _Game_vue_vue_type_template_id_4f1d1f91___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  _Game_vue_vue_type_template_id_694bf0b0___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _Game_vue_vue_type_template_id_694bf0b0___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
   false,
   null,
   null,
@@ -18030,35 +19844,19 @@ __webpack_require__.r(__webpack_exports__);
 
 /***/ }),
 
-/***/ "./src/components/Game.vue?vue&type=style&index=0&lang=scss&":
-/*!*******************************************************************!*\
-  !*** ./src/components/Game.vue?vue&type=style&index=0&lang=scss& ***!
-  \*******************************************************************/
-/*! no static exports found */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _node_modules_style_loader_index_js_node_modules_mini_css_extract_plugin_dist_loader_js_node_modules_css_loader_dist_cjs_js_node_modules_vue_loader_lib_loaders_stylePostLoader_js_node_modules_sass_loader_lib_loader_js_node_modules_vue_loader_lib_index_js_vue_loader_options_Game_vue_vue_type_style_index_0_lang_scss___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/style-loader!../../node_modules/mini-css-extract-plugin/dist/loader.js!../../node_modules/css-loader/dist/cjs.js!../../node_modules/vue-loader/lib/loaders/stylePostLoader.js!../../node_modules/sass-loader/lib/loader.js!../../node_modules/vue-loader/lib??vue-loader-options!./Game.vue?vue&type=style&index=0&lang=scss& */ "./node_modules/style-loader/index.js!./node_modules/mini-css-extract-plugin/dist/loader.js!./node_modules/css-loader/dist/cjs.js!./node_modules/vue-loader/lib/loaders/stylePostLoader.js!./node_modules/sass-loader/lib/loader.js!./node_modules/vue-loader/lib/index.js?!./src/components/Game.vue?vue&type=style&index=0&lang=scss&");
-/* harmony import */ var _node_modules_style_loader_index_js_node_modules_mini_css_extract_plugin_dist_loader_js_node_modules_css_loader_dist_cjs_js_node_modules_vue_loader_lib_loaders_stylePostLoader_js_node_modules_sass_loader_lib_loader_js_node_modules_vue_loader_lib_index_js_vue_loader_options_Game_vue_vue_type_style_index_0_lang_scss___WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_node_modules_style_loader_index_js_node_modules_mini_css_extract_plugin_dist_loader_js_node_modules_css_loader_dist_cjs_js_node_modules_vue_loader_lib_loaders_stylePostLoader_js_node_modules_sass_loader_lib_loader_js_node_modules_vue_loader_lib_index_js_vue_loader_options_Game_vue_vue_type_style_index_0_lang_scss___WEBPACK_IMPORTED_MODULE_0__);
-/* harmony reexport (unknown) */ for(var __WEBPACK_IMPORT_KEY__ in _node_modules_style_loader_index_js_node_modules_mini_css_extract_plugin_dist_loader_js_node_modules_css_loader_dist_cjs_js_node_modules_vue_loader_lib_loaders_stylePostLoader_js_node_modules_sass_loader_lib_loader_js_node_modules_vue_loader_lib_index_js_vue_loader_options_Game_vue_vue_type_style_index_0_lang_scss___WEBPACK_IMPORTED_MODULE_0__) if(__WEBPACK_IMPORT_KEY__ !== 'default') (function(key) { __webpack_require__.d(__webpack_exports__, key, function() { return _node_modules_style_loader_index_js_node_modules_mini_css_extract_plugin_dist_loader_js_node_modules_css_loader_dist_cjs_js_node_modules_vue_loader_lib_loaders_stylePostLoader_js_node_modules_sass_loader_lib_loader_js_node_modules_vue_loader_lib_index_js_vue_loader_options_Game_vue_vue_type_style_index_0_lang_scss___WEBPACK_IMPORTED_MODULE_0__[key]; }) }(__WEBPACK_IMPORT_KEY__));
- /* harmony default export */ __webpack_exports__["default"] = (_node_modules_style_loader_index_js_node_modules_mini_css_extract_plugin_dist_loader_js_node_modules_css_loader_dist_cjs_js_node_modules_vue_loader_lib_loaders_stylePostLoader_js_node_modules_sass_loader_lib_loader_js_node_modules_vue_loader_lib_index_js_vue_loader_options_Game_vue_vue_type_style_index_0_lang_scss___WEBPACK_IMPORTED_MODULE_0___default.a); 
-
-/***/ }),
-
-/***/ "./src/components/Game.vue?vue&type=template&id=4f1d1f91&":
+/***/ "./src/components/Game.vue?vue&type=template&id=694bf0b0&":
 /*!****************************************************************!*\
-  !*** ./src/components/Game.vue?vue&type=template&id=4f1d1f91& ***!
+  !*** ./src/components/Game.vue?vue&type=template&id=694bf0b0& ***!
   \****************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Game_vue_vue_type_template_id_4f1d1f91___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../node_modules/vue-loader/lib??vue-loader-options!./Game.vue?vue&type=template&id=4f1d1f91& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Game.vue?vue&type=template&id=4f1d1f91&");
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Game_vue_vue_type_template_id_4f1d1f91___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Game_vue_vue_type_template_id_694bf0b0___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../node_modules/vue-loader/lib??vue-loader-options!./Game.vue?vue&type=template&id=694bf0b0& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Game.vue?vue&type=template&id=694bf0b0&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Game_vue_vue_type_template_id_694bf0b0___WEBPACK_IMPORTED_MODULE_0__["render"]; });
 
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Game_vue_vue_type_template_id_4f1d1f91___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Game_vue_vue_type_template_id_694bf0b0___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
 
 
 
@@ -18073,18 +19871,20 @@ __webpack_require__.r(__webpack_exports__);
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _Home_vue_vue_type_template_id_31767952___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Home.vue?vue&type=template&id=31767952& */ "./src/components/Home.vue?vue&type=template&id=31767952&");
-/* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
+/* harmony import */ var _Home_vue_vue_type_template_id_7c10bb6e___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Home.vue?vue&type=template&id=7c10bb6e& */ "./src/components/Home.vue?vue&type=template&id=7c10bb6e&");
+/* harmony import */ var _Home_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Home.vue?vue&type=script&lang=js& */ "./src/components/Home.vue?vue&type=script&lang=js&");
+/* empty/unused harmony star reexport *//* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
 
-var script = {}
+
+
 
 
 /* normalize component */
 
-var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_1__["default"])(
-  script,
-  _Home_vue_vue_type_template_id_31767952___WEBPACK_IMPORTED_MODULE_0__["render"],
-  _Home_vue_vue_type_template_id_31767952___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__["default"])(
+  _Home_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__["default"],
+  _Home_vue_vue_type_template_id_7c10bb6e___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _Home_vue_vue_type_template_id_7c10bb6e___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
   false,
   null,
   null,
@@ -18096,19 +19896,83 @@ var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_
 
 /***/ }),
 
-/***/ "./src/components/Home.vue?vue&type=template&id=31767952&":
+/***/ "./src/components/Home.vue?vue&type=script&lang=js&":
+/*!**********************************************************!*\
+  !*** ./src/components/Home.vue?vue&type=script&lang=js& ***!
+  \**********************************************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _node_modules_babel_loader_lib_index_js_node_modules_vue_loader_lib_index_js_vue_loader_options_Home_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/babel-loader/lib!../../node_modules/vue-loader/lib??vue-loader-options!./Home.vue?vue&type=script&lang=js& */ "./node_modules/babel-loader/lib/index.js!./node_modules/vue-loader/lib/index.js?!./src/components/Home.vue?vue&type=script&lang=js&");
+/* empty/unused harmony star reexport */ /* harmony default export */ __webpack_exports__["default"] = (_node_modules_babel_loader_lib_index_js_node_modules_vue_loader_lib_index_js_vue_loader_options_Home_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_0__["default"]); 
+
+/***/ }),
+
+/***/ "./src/components/Home.vue?vue&type=template&id=7c10bb6e&":
 /*!****************************************************************!*\
-  !*** ./src/components/Home.vue?vue&type=template&id=31767952& ***!
+  !*** ./src/components/Home.vue?vue&type=template&id=7c10bb6e& ***!
   \****************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Home_vue_vue_type_template_id_31767952___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../node_modules/vue-loader/lib??vue-loader-options!./Home.vue?vue&type=template&id=31767952& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Home.vue?vue&type=template&id=31767952&");
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Home_vue_vue_type_template_id_31767952___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Home_vue_vue_type_template_id_7c10bb6e___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../node_modules/vue-loader/lib??vue-loader-options!./Home.vue?vue&type=template&id=7c10bb6e& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Home.vue?vue&type=template&id=7c10bb6e&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Home_vue_vue_type_template_id_7c10bb6e___WEBPACK_IMPORTED_MODULE_0__["render"]; });
 
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Home_vue_vue_type_template_id_31767952___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Home_vue_vue_type_template_id_7c10bb6e___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+
+
+
+/***/ }),
+
+/***/ "./src/components/PrivacyPolicy.vue":
+/*!******************************************!*\
+  !*** ./src/components/PrivacyPolicy.vue ***!
+  \******************************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _PrivacyPolicy_vue_vue_type_template_id_7280e2f8___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./PrivacyPolicy.vue?vue&type=template&id=7280e2f8& */ "./src/components/PrivacyPolicy.vue?vue&type=template&id=7280e2f8&");
+/* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
+
+var script = {}
+
+
+/* normalize component */
+
+var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_1__["default"])(
+  script,
+  _PrivacyPolicy_vue_vue_type_template_id_7280e2f8___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _PrivacyPolicy_vue_vue_type_template_id_7280e2f8___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  false,
+  null,
+  null,
+  null
+  
+)
+
+/* harmony default export */ __webpack_exports__["default"] = (component.exports);
+
+/***/ }),
+
+/***/ "./src/components/PrivacyPolicy.vue?vue&type=template&id=7280e2f8&":
+/*!*************************************************************************!*\
+  !*** ./src/components/PrivacyPolicy.vue?vue&type=template&id=7280e2f8& ***!
+  \*************************************************************************/
+/*! exports provided: render, staticRenderFns */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_PrivacyPolicy_vue_vue_type_template_id_7280e2f8___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../node_modules/vue-loader/lib??vue-loader-options!./PrivacyPolicy.vue?vue&type=template&id=7280e2f8& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/PrivacyPolicy.vue?vue&type=template&id=7280e2f8&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_PrivacyPolicy_vue_vue_type_template_id_7280e2f8___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_PrivacyPolicy_vue_vue_type_template_id_7280e2f8___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
 
 
 
@@ -18180,6 +20044,56 @@ __webpack_require__.r(__webpack_exports__);
 
 /***/ }),
 
+/***/ "./src/components/Tutorial.vue":
+/*!*************************************!*\
+  !*** ./src/components/Tutorial.vue ***!
+  \*************************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _Tutorial_vue_vue_type_template_id_4ffde328___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Tutorial.vue?vue&type=template&id=4ffde328& */ "./src/components/Tutorial.vue?vue&type=template&id=4ffde328&");
+/* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
+
+var script = {}
+
+
+/* normalize component */
+
+var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_1__["default"])(
+  script,
+  _Tutorial_vue_vue_type_template_id_4ffde328___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _Tutorial_vue_vue_type_template_id_4ffde328___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  false,
+  null,
+  null,
+  null
+  
+)
+
+/* harmony default export */ __webpack_exports__["default"] = (component.exports);
+
+/***/ }),
+
+/***/ "./src/components/Tutorial.vue?vue&type=template&id=4ffde328&":
+/*!********************************************************************!*\
+  !*** ./src/components/Tutorial.vue?vue&type=template&id=4ffde328& ***!
+  \********************************************************************/
+/*! exports provided: render, staticRenderFns */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Tutorial_vue_vue_type_template_id_4ffde328___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../node_modules/vue-loader/lib??vue-loader-options!./Tutorial.vue?vue&type=template&id=4ffde328& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/Tutorial.vue?vue&type=template&id=4ffde328&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Tutorial_vue_vue_type_template_id_4ffde328___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Tutorial_vue_vue_type_template_id_4ffde328___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+
+
+
+/***/ }),
+
 /***/ "./src/components/environment/EncElement.vue":
 /*!***************************************************!*\
   !*** ./src/components/environment/EncElement.vue ***!
@@ -18189,7 +20103,7 @@ __webpack_require__.r(__webpack_exports__);
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _EncElement_vue_vue_type_template_id_2b832382___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./EncElement.vue?vue&type=template&id=2b832382& */ "./src/components/environment/EncElement.vue?vue&type=template&id=2b832382&");
+/* harmony import */ var _EncElement_vue_vue_type_template_id_0e717933___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./EncElement.vue?vue&type=template&id=0e717933& */ "./src/components/environment/EncElement.vue?vue&type=template&id=0e717933&");
 /* harmony import */ var _EncElement_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./EncElement.vue?vue&type=script&lang=js& */ "./src/components/environment/EncElement.vue?vue&type=script&lang=js&");
 /* empty/unused harmony star reexport *//* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
 
@@ -18201,8 +20115,8 @@ __webpack_require__.r(__webpack_exports__);
 
 var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__["default"])(
   _EncElement_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__["default"],
-  _EncElement_vue_vue_type_template_id_2b832382___WEBPACK_IMPORTED_MODULE_0__["render"],
-  _EncElement_vue_vue_type_template_id_2b832382___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  _EncElement_vue_vue_type_template_id_0e717933___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _EncElement_vue_vue_type_template_id_0e717933___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
   false,
   null,
   null,
@@ -18228,19 +20142,19 @@ __webpack_require__.r(__webpack_exports__);
 
 /***/ }),
 
-/***/ "./src/components/environment/EncElement.vue?vue&type=template&id=2b832382&":
+/***/ "./src/components/environment/EncElement.vue?vue&type=template&id=0e717933&":
 /*!**********************************************************************************!*\
-  !*** ./src/components/environment/EncElement.vue?vue&type=template&id=2b832382& ***!
+  !*** ./src/components/environment/EncElement.vue?vue&type=template&id=0e717933& ***!
   \**********************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_EncElement_vue_vue_type_template_id_2b832382___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../../node_modules/vue-loader/lib??vue-loader-options!./EncElement.vue?vue&type=template&id=2b832382& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/EncElement.vue?vue&type=template&id=2b832382&");
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_EncElement_vue_vue_type_template_id_2b832382___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_EncElement_vue_vue_type_template_id_0e717933___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../../node_modules/vue-loader/lib??vue-loader-options!./EncElement.vue?vue&type=template&id=0e717933& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/EncElement.vue?vue&type=template&id=0e717933&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_EncElement_vue_vue_type_template_id_0e717933___WEBPACK_IMPORTED_MODULE_0__["render"]; });
 
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_EncElement_vue_vue_type_template_id_2b832382___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_EncElement_vue_vue_type_template_id_0e717933___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
 
 
 
@@ -18255,7 +20169,7 @@ __webpack_require__.r(__webpack_exports__);
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _Encounter_vue_vue_type_template_id_b92b5976___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Encounter.vue?vue&type=template&id=b92b5976& */ "./src/components/environment/Encounter.vue?vue&type=template&id=b92b5976&");
+/* harmony import */ var _Encounter_vue_vue_type_template_id_3228fa83___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Encounter.vue?vue&type=template&id=3228fa83& */ "./src/components/environment/Encounter.vue?vue&type=template&id=3228fa83&");
 /* harmony import */ var _Encounter_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Encounter.vue?vue&type=script&lang=js& */ "./src/components/environment/Encounter.vue?vue&type=script&lang=js&");
 /* empty/unused harmony star reexport *//* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
 
@@ -18267,8 +20181,8 @@ __webpack_require__.r(__webpack_exports__);
 
 var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__["default"])(
   _Encounter_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__["default"],
-  _Encounter_vue_vue_type_template_id_b92b5976___WEBPACK_IMPORTED_MODULE_0__["render"],
-  _Encounter_vue_vue_type_template_id_b92b5976___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  _Encounter_vue_vue_type_template_id_3228fa83___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _Encounter_vue_vue_type_template_id_3228fa83___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
   false,
   null,
   null,
@@ -18294,19 +20208,19 @@ __webpack_require__.r(__webpack_exports__);
 
 /***/ }),
 
-/***/ "./src/components/environment/Encounter.vue?vue&type=template&id=b92b5976&":
+/***/ "./src/components/environment/Encounter.vue?vue&type=template&id=3228fa83&":
 /*!*********************************************************************************!*\
-  !*** ./src/components/environment/Encounter.vue?vue&type=template&id=b92b5976& ***!
+  !*** ./src/components/environment/Encounter.vue?vue&type=template&id=3228fa83& ***!
   \*********************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Encounter_vue_vue_type_template_id_b92b5976___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../../node_modules/vue-loader/lib??vue-loader-options!./Encounter.vue?vue&type=template&id=b92b5976& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/Encounter.vue?vue&type=template&id=b92b5976&");
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Encounter_vue_vue_type_template_id_b92b5976___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Encounter_vue_vue_type_template_id_3228fa83___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../../node_modules/vue-loader/lib??vue-loader-options!./Encounter.vue?vue&type=template&id=3228fa83& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/Encounter.vue?vue&type=template&id=3228fa83&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Encounter_vue_vue_type_template_id_3228fa83___WEBPACK_IMPORTED_MODULE_0__["render"]; });
 
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Encounter_vue_vue_type_template_id_b92b5976___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Encounter_vue_vue_type_template_id_3228fa83___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
 
 
 
@@ -18321,7 +20235,7 @@ __webpack_require__.r(__webpack_exports__);
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _Loaded_vue_vue_type_template_id_5abc59da___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Loaded.vue?vue&type=template&id=5abc59da& */ "./src/components/environment/Loaded.vue?vue&type=template&id=5abc59da&");
+/* harmony import */ var _Loaded_vue_vue_type_template_id_6c79262e___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Loaded.vue?vue&type=template&id=6c79262e& */ "./src/components/environment/Loaded.vue?vue&type=template&id=6c79262e&");
 /* harmony import */ var _Loaded_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Loaded.vue?vue&type=script&lang=js& */ "./src/components/environment/Loaded.vue?vue&type=script&lang=js&");
 /* empty/unused harmony star reexport *//* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
 
@@ -18333,8 +20247,8 @@ __webpack_require__.r(__webpack_exports__);
 
 var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__["default"])(
   _Loaded_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__["default"],
-  _Loaded_vue_vue_type_template_id_5abc59da___WEBPACK_IMPORTED_MODULE_0__["render"],
-  _Loaded_vue_vue_type_template_id_5abc59da___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  _Loaded_vue_vue_type_template_id_6c79262e___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _Loaded_vue_vue_type_template_id_6c79262e___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
   false,
   null,
   null,
@@ -18360,19 +20274,85 @@ __webpack_require__.r(__webpack_exports__);
 
 /***/ }),
 
-/***/ "./src/components/environment/Loaded.vue?vue&type=template&id=5abc59da&":
+/***/ "./src/components/environment/Loaded.vue?vue&type=template&id=6c79262e&":
 /*!******************************************************************************!*\
-  !*** ./src/components/environment/Loaded.vue?vue&type=template&id=5abc59da& ***!
+  !*** ./src/components/environment/Loaded.vue?vue&type=template&id=6c79262e& ***!
   \******************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Loaded_vue_vue_type_template_id_5abc59da___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../../node_modules/vue-loader/lib??vue-loader-options!./Loaded.vue?vue&type=template&id=5abc59da& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/Loaded.vue?vue&type=template&id=5abc59da&");
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Loaded_vue_vue_type_template_id_5abc59da___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Loaded_vue_vue_type_template_id_6c79262e___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../../node_modules/vue-loader/lib??vue-loader-options!./Loaded.vue?vue&type=template&id=6c79262e& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/environment/Loaded.vue?vue&type=template&id=6c79262e&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Loaded_vue_vue_type_template_id_6c79262e___WEBPACK_IMPORTED_MODULE_0__["render"]; });
 
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Loaded_vue_vue_type_template_id_5abc59da___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_Loaded_vue_vue_type_template_id_6c79262e___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+
+
+
+/***/ }),
+
+/***/ "./src/components/menus/FooterMenu.vue":
+/*!*********************************************!*\
+  !*** ./src/components/menus/FooterMenu.vue ***!
+  \*********************************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _FooterMenu_vue_vue_type_template_id_934069b0___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./FooterMenu.vue?vue&type=template&id=934069b0& */ "./src/components/menus/FooterMenu.vue?vue&type=template&id=934069b0&");
+/* harmony import */ var _FooterMenu_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./FooterMenu.vue?vue&type=script&lang=js& */ "./src/components/menus/FooterMenu.vue?vue&type=script&lang=js&");
+/* empty/unused harmony star reexport *//* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
+
+
+
+
+
+/* normalize component */
+
+var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__["default"])(
+  _FooterMenu_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__["default"],
+  _FooterMenu_vue_vue_type_template_id_934069b0___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _FooterMenu_vue_vue_type_template_id_934069b0___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  false,
+  null,
+  null,
+  null
+  
+)
+
+/* harmony default export */ __webpack_exports__["default"] = (component.exports);
+
+/***/ }),
+
+/***/ "./src/components/menus/FooterMenu.vue?vue&type=script&lang=js&":
+/*!**********************************************************************!*\
+  !*** ./src/components/menus/FooterMenu.vue?vue&type=script&lang=js& ***!
+  \**********************************************************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _node_modules_babel_loader_lib_index_js_node_modules_vue_loader_lib_index_js_vue_loader_options_FooterMenu_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../../node_modules/babel-loader/lib!../../../node_modules/vue-loader/lib??vue-loader-options!./FooterMenu.vue?vue&type=script&lang=js& */ "./node_modules/babel-loader/lib/index.js!./node_modules/vue-loader/lib/index.js?!./src/components/menus/FooterMenu.vue?vue&type=script&lang=js&");
+/* empty/unused harmony star reexport */ /* harmony default export */ __webpack_exports__["default"] = (_node_modules_babel_loader_lib_index_js_node_modules_vue_loader_lib_index_js_vue_loader_options_FooterMenu_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_0__["default"]); 
+
+/***/ }),
+
+/***/ "./src/components/menus/FooterMenu.vue?vue&type=template&id=934069b0&":
+/*!****************************************************************************!*\
+  !*** ./src/components/menus/FooterMenu.vue?vue&type=template&id=934069b0& ***!
+  \****************************************************************************/
+/*! exports provided: render, staticRenderFns */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_FooterMenu_vue_vue_type_template_id_934069b0___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../../node_modules/vue-loader/lib??vue-loader-options!./FooterMenu.vue?vue&type=template&id=934069b0& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/menus/FooterMenu.vue?vue&type=template&id=934069b0&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_FooterMenu_vue_vue_type_template_id_934069b0___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_FooterMenu_vue_vue_type_template_id_934069b0___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
 
 
 
@@ -18387,7 +20367,7 @@ __webpack_require__.r(__webpack_exports__);
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _MainMenu_vue_vue_type_template_id_b50e0fd4___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./MainMenu.vue?vue&type=template&id=b50e0fd4& */ "./src/components/menus/MainMenu.vue?vue&type=template&id=b50e0fd4&");
+/* harmony import */ var _MainMenu_vue_vue_type_template_id_1f298990___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./MainMenu.vue?vue&type=template&id=1f298990& */ "./src/components/menus/MainMenu.vue?vue&type=template&id=1f298990&");
 /* harmony import */ var _MainMenu_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./MainMenu.vue?vue&type=script&lang=js& */ "./src/components/menus/MainMenu.vue?vue&type=script&lang=js&");
 /* empty/unused harmony star reexport *//* harmony import */ var _node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../node_modules/vue-loader/lib/runtime/componentNormalizer.js */ "./node_modules/vue-loader/lib/runtime/componentNormalizer.js");
 
@@ -18399,8 +20379,8 @@ __webpack_require__.r(__webpack_exports__);
 
 var component = Object(_node_modules_vue_loader_lib_runtime_componentNormalizer_js__WEBPACK_IMPORTED_MODULE_2__["default"])(
   _MainMenu_vue_vue_type_script_lang_js___WEBPACK_IMPORTED_MODULE_1__["default"],
-  _MainMenu_vue_vue_type_template_id_b50e0fd4___WEBPACK_IMPORTED_MODULE_0__["render"],
-  _MainMenu_vue_vue_type_template_id_b50e0fd4___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
+  _MainMenu_vue_vue_type_template_id_1f298990___WEBPACK_IMPORTED_MODULE_0__["render"],
+  _MainMenu_vue_vue_type_template_id_1f298990___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"],
   false,
   null,
   null,
@@ -18426,19 +20406,19 @@ __webpack_require__.r(__webpack_exports__);
 
 /***/ }),
 
-/***/ "./src/components/menus/MainMenu.vue?vue&type=template&id=b50e0fd4&":
+/***/ "./src/components/menus/MainMenu.vue?vue&type=template&id=1f298990&":
 /*!**************************************************************************!*\
-  !*** ./src/components/menus/MainMenu.vue?vue&type=template&id=b50e0fd4& ***!
+  !*** ./src/components/menus/MainMenu.vue?vue&type=template&id=1f298990& ***!
   \**************************************************************************/
 /*! exports provided: render, staticRenderFns */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_MainMenu_vue_vue_type_template_id_b50e0fd4___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../../node_modules/vue-loader/lib??vue-loader-options!./MainMenu.vue?vue&type=template&id=b50e0fd4& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/menus/MainMenu.vue?vue&type=template&id=b50e0fd4&");
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_MainMenu_vue_vue_type_template_id_b50e0fd4___WEBPACK_IMPORTED_MODULE_0__["render"]; });
+/* harmony import */ var _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_MainMenu_vue_vue_type_template_id_1f298990___WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! -!../../../node_modules/vue-loader/lib/loaders/templateLoader.js??vue-loader-options!../../../node_modules/vue-loader/lib??vue-loader-options!./MainMenu.vue?vue&type=template&id=1f298990& */ "./node_modules/vue-loader/lib/loaders/templateLoader.js?!./node_modules/vue-loader/lib/index.js?!./src/components/menus/MainMenu.vue?vue&type=template&id=1f298990&");
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "render", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_MainMenu_vue_vue_type_template_id_1f298990___WEBPACK_IMPORTED_MODULE_0__["render"]; });
 
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_MainMenu_vue_vue_type_template_id_b50e0fd4___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "staticRenderFns", function() { return _node_modules_vue_loader_lib_loaders_templateLoader_js_vue_loader_options_node_modules_vue_loader_lib_index_js_vue_loader_options_MainMenu_vue_vue_type_template_id_1f298990___WEBPACK_IMPORTED_MODULE_0__["staticRenderFns"]; });
 
 
 
@@ -18451,7 +20431,7 @@ __webpack_require__.r(__webpack_exports__);
 /*! exports provided: 0, 1, 2, 3, default */
 /***/ (function(module) {
 
-module.exports = [{"name":"critical role","spynopsis":"blah blah","contents":{"world":"Ravenstorm","characters":[{"name":"Boligrafor","description":""},{"name":"Tazor","description":""},{"name":"Manzanor","description":""},{"name":"Cuchillor","description":""}],"non-player-characters":[{"name":"Meher 1","description":""},{"name":"Meher 2","description":""},{"name":"Meher 3","description":""},{"name":"Meher 4","description":""}]}},{"name":"The Unexpectables","spynopsis":"blah blah","contents":{"world":"Ravenstorm","characters":[{"name":"Boligrafor","description":""},{"name":"Tazor","description":""},{"name":"Manzanor","description":""},{"name":"Cuchillor","description":""}],"non-player-characters":[{"name":"Meher 1","description":""},{"name":"Meher 2","description":""},{"name":"Meher 3","description":""},{"name":"Meher 4","description":""}]}},{"name":"Maze Arcana","spynopsis":"blah blah","contents":{"world":"Ravenstorm","characters":[{"name":"Boligrafor","description":""},{"name":"Tazor","description":""},{"name":"Manzanor","description":""},{"name":"Cuchillor","description":""}],"non-player-characters":[{"name":"Meher 1","description":""},{"name":"Meher 2","description":""},{"name":"Meher 3","description":""},{"name":"Meher 4","description":""}]}},{"name":"Grim Windmill","spynopsis":"blah blah","contents":{"world":"Ravenstorm","characters":[{"name":"Boligrafor","description":""},{"name":"Tazor","description":""},{"name":"Manzanor","description":""},{"name":"Cuchillor","description":""}],"non-player-characters":[{"name":"Meher 1","description":""},{"name":"Meher 2","description":""},{"name":"Meher 3","description":""},{"name":"Meher 4","description":""}]}}];
+module.exports = [{"name":"Grim Windmill","spynopsis":"blah blah","notes":"","contents":{"world":"Ravenstorm","plots":[],"characters":[{"portrait":"https://i.kinja-img.com/gawker-media/image/upload/s--NdbChKcZ--/c_scale,f_auto,fl_progressive,q_80,w_800/18j3zwhxy85iyjpg.jpg","characterType":"pc","characterClass":"Warrior","type":"creature","name":"Rykha","index":"","alias":"Hija de Kor'moon","age":28,"gender":"female","stats":{"str":18,"dex":15,"con":12,"sta":10,"app":7,"pow":10},"martialProwess":4,"damageBonus":6,"defenseValue":14,"hitpoints":75,"tempHitpoints":70,"sanity":50,"tempSanity":50,"charisma":8,"actions":[{"name":"Attack"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Perception"},{"name":"Jump"},{"name":"Climb"},{"name":"Swim"},{"name":"Manipulate Mechanism"}],"classActions":[{"name":"Ranged"},{"name":"Brawl"},{"name":"Melee"},{"name":"Swim"}],"pPerception":12,"weapons":[{"name":"Long Sword","type":"Melee","mp":0,"range":5,"damage":[4,7,12]},{"name":"Uftberht","type":"Melee","mp":0,"range":5,"damage":[4,7,12]},{"name":"Composite Bow","type":"Ranged","mp":0,"range":35,"damage":[4,8,12]}],"armor":[{"name":"Leather Bracers","defense":1},{"name":"Leather Armor","defense":2},{"name":"Leather Helmet","defense":2}]},{"portrait":"https://cdnb.artstation.com/p/assets/images/images/005/395/785/large/anthony-l-m-barbarian-massacre-anthony-lm-ss.jpg?1490724835","characterType":"pc","characterClass":"Hunter","type":"creature","name":"Harold","index":"","alias":"Caraquemada","age":26,"gender":"male","stats":{"str":14,"dex":18,"con":14,"sta":10,"app":4,"pow":12},"martialProwess":5,"damageBonus":6,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"tempSanity":48,"charisma":8,"actions":[{"name":"Attack"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Perception"},{"name":"Jump"},{"name":"Climb"},{"name":"Swim"},{"name":"Intimidate"},{"name":"Manipulate Mechanism"}],"classActions":[{"name":"Ranged"},{"name":"Brawl"},{"name":"Melee"},{"name":"Hunt"},{"name":"Disarm Trap"}],"pPerception":12,"weapons":[{"name":"Spear","mp":0,"type":"Melee","range":10,"damage":[4,8,12]},{"name":"Dagger","mp":0,"type":"Melee","range":5,"damage":[3,5,9]},{"name":"Composite Bow","mp":0,"type":"Ranged","range":45,"damage":[4,8,12]}],"armor":[{"name":"Leather Bracers","defense":1},{"name":"Leather Armor","defense":2},{"name":"Leather Helmet","defense":2}]},{"portrait":"https://i.etsystatic.com/7197050/d/il/c900fa/1615953936/il_340x270.1615953936_pgtl.jpg?version=0","characterType":"pc","characterClass":"Shaman","type":"creature","name":"Nai","index":"","alias":"Shamalang","age":32,"gender":"male","stats":{"str":14,"dex":14,"con":14,"sta":10,"app":8,"pow":16},"martialProwess":4,"damageBonus":4,"defenseValue":11,"hitpoints":70,"tempHitpoints":70,"sanity":60,"tempSanity":40,"charisma":12,"actions":[{"name":"Attack"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Perception"},{"name":"Jump"},{"name":"Climb"},{"name":"Swim"},{"name":"Intimidate"},{"name":"Manipulate Mechanism"},{"name":"Curse"},{"name":"Bless"},{"name":"Charm"},{"name":"Detect Magic"},{"name":"Light Fire"},{"name":"Telekinesis"},{"name":"Terror"},{"name":"Illusion of Self"}],"classActions":[{"name":"Ranged"},{"name":"Brawl"},{"name":"Melee"},{"name":"Herbalism"},{"name":"Healing"}],"pPerception":12,"weapons":[{"name":"Staff","mp":0,"type":"Melee","range":10,"damage":[3,6,8]},{"name":"Composite Bow","mp":0,"type":"Ranged","range":35,"damage":[4,8,12]}],"armor":[{"name":"Leather Bracers","defense":1},{"name":"Leather Greaves","defense":1}]}],"non-player-characters":[{"name":"Meher 1","description":""},{"name":"Meher 2","description":""},{"name":"Meher 3","description":""},{"name":"Meher 4","description":""}]}},{"name":"The Unexpectables","spynopsis":"blah blah","notes":"","contents":{"world":"Ravenstorm","plots":[],"characters":[{"name":"Boligrafor","description":""},{"name":"Tazor","description":""},{"name":"Manzanor","description":""},{"name":"Cuchillor","description":""}],"non-player-characters":[{"name":"Meher 1","description":""},{"name":"Meher 2","description":""},{"name":"Meher 3","description":""},{"name":"Meher 4","description":""}]}},{"name":"Maze Arcana","spynopsis":"blah blah","notes":"","contents":{"world":"Ravenstorm","characters":[{"name":"Boligrafor","description":""},{"name":"Tazor","description":""},{"name":"Manzanor","description":""},{"name":"Cuchillor","description":""}],"non-player-characters":[{"name":"Meher 1","description":""},{"name":"Meher 2","description":""},{"name":"Meher 3","description":""},{"name":"Meher 4","description":""}]}},{"name":"Critical Role","spynopsis":"blah blah","notes":"","contents":{"world":"Ravenstorm","plots":[],"characters":[{"name":"Boligrafor","description":""},{"name":"Tazor","description":""},{"name":"Manzanor","description":""},{"name":"Cuchillor","description":""}],"non-player-characters":[{"name":"Meher 1","description":""},{"name":"Meher 2","description":""},{"name":"Meher 3","description":""},{"name":"Meher 4","description":""}]}}];
 
 /***/ }),
 
@@ -18500,11 +20480,14 @@ var _games_games_json__WEBPACK_IMPORTED_MODULE_4___namespace = /*#__PURE__*/__we
 
 
 
-vue__WEBPACK_IMPORTED_MODULE_0__["default"].use(vuex__WEBPACK_IMPORTED_MODULE_1__["default"]);
-var selectedGame = _worlds_ravenstorm_json__WEBPACK_IMPORTED_MODULE_2__;
+vue__WEBPACK_IMPORTED_MODULE_0__["default"].use(vuex__WEBPACK_IMPORTED_MODULE_1__["default"]); //let games = [];
+
 var store = new vuex__WEBPACK_IMPORTED_MODULE_1__["default"].Store({
   state: {
+    userLogin: true,
     worlds: [_worlds_ravenstorm_json__WEBPACK_IMPORTED_MODULE_2__, _worlds_heavy_metal_json__WEBPACK_IMPORTED_MODULE_3__],
+    chosenWorld: 0,
+    chosenGame: 0,
     "char": {
       statNumbers: 54,
       index: null,
@@ -18543,260 +20526,19 @@ var store = new vuex__WEBPACK_IMPORTED_MODULE_1__["default"].Store({
     rollResult: null,
     activeScore: null,
     passiveScore: null,
-    selectedAction: '-- Select Action --',
+    selectedAction: "-- Select Action --",
     selectedTarget: {},
-    resultMessage: '',
+    resultMessage: "",
     storyElements: [],
-    characterList: [{
-      "portrait": 'https://i.kinja-img.com/gawker-media/image/upload/s--NdbChKcZ--/c_scale,f_auto,fl_progressive,q_80,w_800/18j3zwhxy85iyjpg.jpg',
-      "characterType": "pc",
-      "characterClass": "Guardian",
-      "type": "creature",
-      "name": "Rykha",
-      "index": "",
-      "alias": "Hija de Kor'moon",
-      "age": 28,
-      "gender": "female",
-      "stats": {
-        "str": 18,
-        "dex": 15,
-        "con": 12,
-        "sta": 10,
-        "app": 7,
-        "pow": 10
-      },
-      "martialProwess": 4,
-      "damageBonus": 6,
-      "defenseValue": 14,
-      "hitpoints": 75,
-      "tempHitpoints": 75,
-      "sanity": 50,
-      "tempSanity": 50,
-      "charisma": 8,
-      "actions": [{
-        "name": "Attack"
-      }, {
-        "name": "Heal"
-      }, {
-        "name": "Haggle"
-      }, {
-        "name": "Persuade"
-      }, {
-        "name": "Intimidate"
-      }, {
-        "name": "Pickpocket"
-      }, {
-        "name": "Manipulate Mechanism"
-      }],
-      "classActions": [{
-        "name": "Pickpocket"
-      }, {
-        "name": "Ranged"
-      }, {
-        "name": "Brawl"
-      }, {
-        "name": "Melee"
-      }, {
-        "name": "Hunt"
-      }, {
-        "name": "Swim"
-      }, {
-        "name": "Disarm Trap"
-      }],
-      "pPerception": 12,
-      "weapons": [{
-        "name": "Long Sword",
-        "mp": 0,
-        "range": 5,
-        "damage": [4, 7, 12]
-      }, {
-        "name": "Composite Bow",
-        "mp": 0,
-        "range": 35,
-        "damage": [4, 8, 12]
-      }],
-      "armor": [{
-        "name": "Leather Bracers",
-        "defense": 1
-      }, {
-        "name": "Leather Armor",
-        "defense": 2
-      }, {
-        "name": "Leather Helmet",
-        "defense": 2
-      }]
-    }, {
-      "portrait": 'https://cdnb.artstation.com/p/assets/images/images/005/395/785/large/anthony-l-m-barbarian-massacre-anthony-lm-ss.jpg?1490724835',
-      "characterType": "pc",
-      "characterClass": "Hunter",
-      "type": "creature",
-      "name": "Harold",
-      "index": "",
-      "alias": "Caraquemada",
-      "age": 26,
-      "gender": "male",
-      "stats": {
-        "str": 14,
-        "dex": 18,
-        "con": 14,
-        "sta": 10,
-        "app": 4,
-        "pow": 12
-      },
-      "martialProwess": 5,
-      "damageBonus": 6,
-      "defenseValue": 15,
-      "hitpoints": 70,
-      "tempHitpoints": 47,
-      "sanity": 60,
-      "tempSanity": 48,
-      "charisma": 8,
-      "actions": [{
-        "name": "Attack"
-      }, {
-        "name": "Heal"
-      }, {
-        "name": "Haggle"
-      }, {
-        "name": "Persuade"
-      }, {
-        "name": "Intimidate"
-      }, {
-        "name": "Pickpocket"
-      }, {
-        "name": "Manipulate Mechanism"
-      }],
-      "classActions": [{
-        "name": "Pickpocket"
-      }, {
-        "name": "Ranged"
-      }, {
-        "name": "Brawl"
-      }, {
-        "name": "Melee"
-      }, {
-        "name": "Hunt"
-      }, {
-        "name": "Swim"
-      }, {
-        "name": "Disarm Trap"
-      }],
-      "pPerception": 12,
-      "weapons": [{
-        "name": "Club",
-        "mp": 0,
-        "range": 5,
-        "damage": [4, 8, 10]
-      }, {
-        "name": "Composite Bow",
-        "mp": 0,
-        "range": 45,
-        "damage": [4, 8, 12]
-      }],
-      "armor": [{
-        "name": "Leather Bracers",
-        "defense": 1
-      }, {
-        "name": "Leather Armor",
-        "defense": 2
-      }, {
-        "name": "Leather Helmet",
-        "defense": 2
-      }]
-    }, {
-      "portrait": 'https://i.etsystatic.com/7197050/d/il/c900fa/1615953936/il_340x270.1615953936_pgtl.jpg?version=0',
-      "characterType": "pc",
-      "characterClass": "Shaman",
-      "type": "creature",
-      "name": "Yorubo",
-      "index": "",
-      "alias": "the Greedy",
-      "age": 26,
-      "gender": "male",
-      "stats": {
-        "str": 14,
-        "dex": 14,
-        "con": 14,
-        "sta": 10,
-        "app": 8,
-        "pow": 16
-      },
-      "martialProwess": 4,
-      "damageBonus": 4,
-      "defenseValue": 11,
-      "hitpoints": 70,
-      "tempHitpoints": 70,
-      "sanity": 60,
-      "tempSanity": 60,
-      "charisma": 12,
-      "actions": [{
-        "name": "Attack"
-      }, {
-        "name": "Heal"
-      }, {
-        "name": "Haggle"
-      }, {
-        "name": "Persuade"
-      }, {
-        "name": "Intimidate"
-      }, {
-        "name": "Pickpocket"
-      }, {
-        "name": "Manipulate Mechanism"
-      }, {
-        "name": "Curse"
-      }, {
-        "name": "Bless"
-      }, {
-        "name": "Charm"
-      }, {
-        "name": "Detect Magic"
-      }, {
-        "name": "Light Fire"
-      }, {
-        "name": "Telekinesis"
-      }, {
-        "name": "Terror"
-      }, {
-        "name": "Illusion of Self"
-      }],
-      "classActions": [{
-        "name": "Pickpocket"
-      }, {
-        "name": "Ranged"
-      }, {
-        "name": "Brawl"
-      }, {
-        "name": "Melee"
-      }, {
-        "name": "Hunt"
-      }, {
-        "name": "Swim"
-      }, {
-        "name": "Disarm Trap"
-      }],
-      "pPerception": 12,
-      "weapons": [{
-        "name": "Staff",
-        "mp": 0,
-        "range": 10,
-        "damage": [3, 6, 8]
-      }, {
-        "name": "Composite Bow",
-        "mp": 0,
-        "range": 35,
-        "damage": [4, 8, 12]
-      }],
-      "armor": [{
-        "name": "Leather Bracers",
-        "defense": 1
-      }, {
-        "name": "Leather Greaves",
-        "defense": 1
-      }]
-    }],
+    characterList: [],
     targets: [],
-    selectedGame: selectedGame
+    selectedGame: [],
+    mainPageBanner: {
+      image: "https://socialpsychol.files.wordpress.com/2014/03/frank-frazetta_poster_banner.jpg?w=590&h=270",
+      h1: "Grim Windmill",
+      h3: "The application that helps Storytellers run Tabletop Roleplaying Games on the go, just by using this app on their mobile or tablet."
+    },
+    mainPageText: "<h4>So what exactly is Grim Windmill?</h4><p>It is a multi-setting platform in which to run an adventure quickly and without experience, rules learning or even a single minute of preparation. The combat is taken care of, the encounters, the social events... all you have to do is click or drag and drop the elements of the story that you want to add to the adventure and everything else is automated.</p><p>The idea is to minimize the amount of paperwork a Storyteller has to prepare, the clunky combat mechanics that some encounters can lead to, the game-breaking magic that could disproportionally tip the balance of an encounter, it being social, exploration or combat.</p><p>The rules system behind Grim Windmill is an amalgamation of 5e D&D, Kult, call of Cthulhu, vampire the masquerade and Stormbringer. There are no mental stats, leaving the intelligence and wisdom to the player, and giving the character anything the player cannot contribute with, mostly physical traits like Appearance and Strenth, Power being the only stat that is not reflected in a physical way.</p><p>It is also a very convenient, out of the box system to carry in your bag or pocket if you are intending to run a LARP game</p><h4>What Grim Windmill is not</h4><p>This platform is NOT trying to compete with D&D, Vampire the Masquerade and such. It is not a full-fledged, rulebook worthy system. Even <a href='https://www.goodreads.com/book/show/23568787-fanhunter-el-juego-de-rol-epicodecadente' target='blank'>Fanhunter</a>* would be more complex. It is only serving as a jumping board for those who have very little time to prepare, or are too insecure to take on the mantle of a DM or a Keeper.</p><p>It will not satisfy your needs to create a character that is heavily personalised and stats-jacked. It will not be of use to metagamers, since all the rules are run by the engine. It will not handhold the narrative so the Storyteller will end up being comfortable but inflexible on her/his decisions.</p><p class='ref'>*Fanhunter was a Spanish tabletop RPG from the nineties, based on a satirical cartoonish monthly strip by Cels Piñol. It was based on a dystopian future where tabletop games, comic books, roleplaying games, warhammer, trading card games and videogames were forbidden by an authoritarian monastical figure: Pope Alejo Cuervo I. The resistance (ie. the player characters) was formed by badass Geeks and bootleg versions of the Marvel universe superheroes.</p>"
   },
   getters: {
     selectGame: function selectGame(state) {
@@ -18829,7 +20571,7 @@ module.exports = {"name":"Heavy Metal","environment":{"title":"Heavy Metal","fon
 /*! exports provided: environment, scenery, npcs, creatures, default */
 /***/ (function(module) {
 
-module.exports = {"environment":{"title":"Ravenstorm","font-family":"","background":"","blurb":"","plots":[{"characterClass":"Minor Urban Plot","territory":"town","description":"","portrait":["https://rpg.ambient-mixer.com/images_template/f/1/7/f1763e12d49d3ef38278fb3473f1ec16_full.jpg"],"route":"minor-plot"},{"characterClass":"Minor Forest Plot","territory":"forest","description":"","portrait":["https://i.pinimg.com/originals/6f/c6/d5/6fc6d561028d946f08c98148c1f1a8f3.jpg"],"route":"minor-plot"},{"characterClass":"Minor Desert Plot","territory":"desert","description":"","portrait":["https://i.pinimg.com/originals/0a/9e/e2/0a9ee2a5e42bb5f24a4d0bd8a2652767.jpg"],"route":"minor-plot"},{"characterClass":"Minor Steppes Plot","territory":"steppes","description":"","portrait":["https://cdnb.artstation.com/p/assets/images/images/011/024/203/large/amos-yan-ffxiv-bg-speedpaint.jpg?1527488177"],"route":"minor-plot"},{"characterClass":"Minor Jungle Plot","territory":"jungle","description":"","portrait":["https://i.pinimg.com/originals/dd/3f/46/dd3f4621c91e3401e555cf4a42204021.jpg"],"route":"minor-plot"},{"characterClass":"Minor Mountains Plot","territory":"mountains","description":"","portrait":["https://i.pinimg.com/736x/ef/f0/5b/eff05b35bb0824467634372d81d8550a.jpg"],"route":"minor-plot"},{"characterClass":"Minor Arctic Plot","territory":"frozen","description":"","portrait":["https://fiverr-res.cloudinary.com/images/t_main1,q_auto,f_auto/gigs/121935800/original/ec72e33327ce1f7f85fb9d5a1ab3edaef4c6de55/draw-illustration-for-you.jpg"],"route":"minor-plot"},{"characterClass":"Minor Interdimension Plot","territory":"dimension","description":"","portrait":["https://i.pinimg.com/originals/d0/d5/12/d0d512fa230d9162b52111be3c28ab1a.jpg"],"route":"minor-plot"},{"characterClass":"Minor Court Plot","territory":"noble court","description":"","portrait":["https://i.pinimg.com/originals/bf/0d/a1/bf0da11a8607b210706bb2e2c85502a3.jpg"],"route":"minor-plot"},{"characterClass":"Minor Dungeon Plot","territory":"dungeon","description":"","portrait":["https://i.pinimg.com/originals/ad/48/47/ad48473365ace99a8ccf26ebd6ff6543.jpg"],"route":"minor-plot"},{"characterClass":"Minor Sea Plot","territory":"sea","description":"","portrait":["https://i.pinimg.com/originals/82/cc/cc/82cccc8ea52b5936e407aff6be29fc83.jpg"],"route":"minor-plot"}],"inventory":[{"characterClass":"Gold Piece","description":"","portrait":["https://i.pinimg.com/originals/ef/4a/3c/ef4a3c259a7bc796b8ee10755713b611.jpg"],"route":"minor-plot"},{"characterClass":"Silver Piece","description":"","portrait":["http://nebula.wsimg.com/13db16fd8005e2fd0f7e0e541a76c233?AccessKeyId=ACFBBC4C4391ACA1C912&disposition=0&alloworigin=1"],"route":"minor-plot"},{"characterClass":"Copper Piece","description":"","portrait":["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRHpFOn3hRgszpPwxrbq1D5bjFsKF4vjhyd3U9CPzbal5NzF0H6yA"],"route":"minor-plot"},{"characterClass":"Bandage","description":"","portrait":["https://vignette.wikia.nocookie.net/granblue/images/4/4e/Ancient_Bandages.png/revision/latest/scale-to-width-down/600?cb=20161007002920"],"route":"minor-plot"},{"characterClass":"Bread","description":"","portrait":["https://img.freepik.com/free-vector/freshly-baked-multigrain-bread-hand-drawn-illustration_53876-2662.jpg?size=338&ext=jpg"],"route":"minor-plot"},{"characterClass":"Bacon","description":"","portrait":["https://i.etsystatic.com/10185029/r/il/7ddc49/1558175531/il_794xN.1558175531_hs99.jpg"],"route":"minor-plot"},{"characterClass":"Dried Meat","description":"","portrait":["https://image.shutterstock.com/image-photo/drycured-pork-sketch-illustration-on-260nw-1339716011.jpg"],"route":"minor-plot"},{"characterClass":"Pickled Cabbage","description":"","portrait":["https://st.depositphotos.com/1701169/4601/v/950/depositphotos_46013803-stock-illustration-a-jar-of-pickled-fresh.jpg"],"route":"minor-plot"},{"characterClass":"Stew","description":"","portrait":["https://i.pinimg.com/originals/a2/68/e8/a268e86b68b15ca1828d98297cb6c6cb.jpg"],"route":"minor-plot"},{"characterClass":"Sausages","description":"","portrait":["https://static.vecteezy.com/system/resources/thumbnails/000/383/526/small/dw2-noon-sasi-37-03-gastropub.jpg"],"route":"minor-plot"},{"characterClass":"Roast Chicken","description":"","portrait":["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSvf5U51TpjHxCpE9mqxPkFPKQtAL7O7Hzm3JFxQrDAmML3fY6j"],"route":"minor-plot"},{"characterClass":"Steak","description":"","portrait":["https://as2.ftcdn.net/jpg/01/92/99/71/500_F_192997190_vGoyYbXleWot8bQGdaZWHoyoHyMbwBnh.jpg"],"route":"minor-plot"},{"characterClass":"Wine","description":"","portrait":["https://i.pinimg.com/originals/1d/eb/99/1deb99c7bb166f357e2e6db088e92faa.jpg"],"route":"minor-plot"},{"characterClass":"Beer","description":"","portrait":["https://i.pinimg.com/originals/83/b3/fb/83b3fb93f689f36021fe9dc1477bbf7e.jpg"],"route":"minor-plot"},{"characterClass":"Giant's Beer","description":"","portrait":["https://cdna.artstation.com/p/assets/images/images/002/988/372/large/andre-meister-andremeister-dwarf.jpg?1468183720"],"route":"minor-plot"},{"characterClass":"Mead","description":"","portrait":["https://thumbs.dreamstime.com/z/barrel-11050360.jpg"],"route":"minor-plot"},{"characterClass":"Grog","description":"","portrait":["http://www.steveonsteins.com/wp-content/uploads/2010/05/1882-Woodcut-Glass-Drinking-Horn-Iron-Age-Archaeological-Item-Prehistoric-Tool-337x450.jpg"],"route":"minor-plot"},{"characterClass":"Honey","description":"","portrait":["https://banner2.kisspng.com/20180224/aaq/kisspng-honey-drawing-watercolor-painting-illustration-honey-5a91e939b43402.9367058415195118657381.jpg"],"route":"minor-plot"}],"weaponry":[{"characterClass":"Battle Axe","description":"","portrait":["https://cdn.conceptartempire.com/images/11/3090/03-warhammer-ax.jpg"],"route":"minor-plot"},{"characterClass":"Ulfberht","description":"","portrait":["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR6GTWwwBCdmy1lXRpkKL3ew0I6-anRgtWAIQnQoLm8T5uG0ZwfQg"],"route":"minor-plot"},{"characterClass":"Gladius","description":"","portrait":["https://mcishop.azureedge.net/mciassets/w_2_0011855_short-ancient-roman-gladius-larp-sword_550.png"],"route":"minor-plot"},{"characterClass":"Long Sword","description":"","portrait":["https://mocah.org/thumbs/4524717-war-sword-of-atlantis-conan-the-barbarian.jpg"],"route":"minor-plot"},{"characterClass":"Spiked Club","description":"","portrait":["https://i.pinimg.com/originals/87/6f/f9/876ff9112486078a9eb4dcf2b7a348c7.jpg"],"route":"minor-plot"},{"characterClass":"Spear","description":"","portrait":["https://image.shutterstock.com/image-vector/vector-image-fantasy-weapon-spear-260nw-1210366759.jpg"],"route":"minor-plot"},{"characterClass":"Staff","description":"","portrait":["https://cdnb.artstation.com/p/assets/images/images/011/245/477/large/kara-woods-stx-final.jpg?1532734767"],"route":"minor-plot"},{"characterClass":"Dagger","description":"","portrait":["http://www.chroniclebooks.com/blog/wp-content/uploads/Final_dagger.jpg"],"route":"minor-plot"},{"characterClass":"Sling","description":"","portrait":["https://cdn.shopify.com/s/files/1/1004/9126/products/Titan_Sling_Top.jpg?v=1516412403"],"route":"minor-plot"},{"characterClass":"Atlatl","description":"","portrait":["https://collectionapi.metmuseum.org/api/collection/v1/iiif/315225/659089/main-image"],"route":"minor-plot"},{"characterClass":"Bow","description":"","portrait":["https://www.pngkey.com/png/detail/38-385968_clip-art-library-stock-arrows-drawing-fantasy-bow.png"],"route":"minor-plot"},{"characterClass":"Composite Bow","description":"","portrait":["https://i.pinimg.com/236x/c7/54/1b/c7541b65829d7526ba14b781651e199f--fantasy-weapons.jpg"],"route":"minor-plot"},{"characterClass":"Leather Armor","description":"","portrait":["https://i.mmo.cm/is/image/mmoimg/bigview/dragonrider-leather-armor-black--mw-302477-1.jpg"],"route":"minor-plot"},{"characterClass":"Chainmail","description":"","portrait":["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEmEAJP61dCHtO2_6QY11lQ-kxgWktoKGs3RF3c8x0UnipQDvqJg"],"route":"minor-plot"},{"characterClass":"Leather Helmet","description":"","portrait":["https://steel-mastery.com/image/catalog/products/FH-01/Leather_helmet_Sallet.jpg"],"route":"minor-plot"},{"characterClass":"Metal Helmet","description":"","portrait":["https://images-na.ssl-images-amazon.com/images/I/619sq4roa2L._SY355_.jpg"],"route":"minor-plot"},{"characterClass":"Leather Bracers","description":"","portrait":["https://i.etsystatic.com/7792648/r/il/71ca63/1491060687/il_794xN.1491060687_7dhp.jpg"],"route":"minor-plot"},{"characterClass":"Leather Greaves","description":"","portrait":["https://cdn3.eviltailors.com/20242-big_default_2x/quintus-upper-leather-greaves.jpg"],"route":"minor-plot"},{"characterClass":"Metal Bracers","description":"","portrait":["https://farm1.static.flickr.com/265/32180651910_9293d030a3_b.jpg"],"route":"minor-plot"},{"characterClass":"Metal Greaves","description":"","portrait":["https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Pair_of_Greaves_%28Lower_Leg_Defenses%29_MET_DP-13125-029.jpg/170px-Pair_of_Greaves_%28Lower_Leg_Defenses%29_MET_DP-13125-029.jpg"],"route":"minor-plot"}],"portents":[{"characterClass":"Curse","description":"<p>There are many different beings, including humans, that can curse someone. These curses take many different shapes. As opposed to what people believe, they do not affect the victim in combat but rather in their every day life, constantly and mercilessly.</p><p>Maybe the powerful merchant starts losing their gold and wares, then their home and family, until nothing is left of them except a beggar. Maybe the beautiful courtisan starts getting a rash in their face until nobody wants to lay with them in bed</p><p>Curses are an excellet tool for the Narrator to use and stir the plot when a player has not been taking their own decisions seriously at crucial points of the adventure/</p><b>It is up to the story itself on how a character will get cleared of the curse.</b>","portrait":["https://i.pinimg.com/originals/51/98/8b/51988b770c5de63c939e5207ee86d128.jpg"],"route":"minor-plot"},{"characterClass":"Blessing","description":"","portrait":["https://i.pinimg.com/originals/2c/44/6e/2c446e932f0e72f6a756884bef7e4059.jpg"],"route":"minor-plot"},{"characterClass":"Telekinesis","description":"","portrait":["https://i.warosu.org/data/tg/img/0367/88/1418702014220.jpg"],"route":"minor-plot"},{"characterClass":"Charm","description":"","portrait":["https://i.pinimg.com/originals/71/9a/6f/719a6fe9b115d4f042b80e92d993ba76.jpg"],"route":"minor-plot"},{"characterClass":"Light Fire","description":"","portrait":["http://th07.deviantart.net/fs70/PRE/i/2010/169/b/0/Fire_mage_by_Eliag1101.jpg"],"route":"minor-plot"},{"characterClass":"Terror","description":"","portrait":["https://i.pinimg.com/originals/70/c8/c3/70c8c3561a29fd28cbfa6baea8e40359.jpg"],"route":"minor-plot"},{"characterClass":"Illusion of Self","description":"","portrait":["https://i.pinimg.com/originals/59/df/2f/59df2f5c6b4d9d07dc973a25e390e87a.jpg"],"route":"minor-plot"},{"characterClass":"Awaken Elder God","description":"","portrait":["https://scontent-lga3-1.cdninstagram.com/vp/b11eeff68c6e49258ac53a80a16e2e6a/5D695B22/t51.2885-15/e15/c236.0.607.607a/56213865_2057872174341004_3989982013542902704_n.jpg?_nc_ht=scontent-lga3-1.cdninstagram.com"],"route":"minor-plot"},{"characterClass":"Attain Immortality","description":"","portrait":["http://www.epilogue.net/sites/default/files/imagecache/gallery_lg/images/02/41/13768_1034568000.jpg"],"route":"minor-plot"},{"characterClass":"Abomination","description":"","portrait":["https://i.pinimg.com/originals/ca/c3/2a/cac32a36514df1855e6b914f003cb023.jpg"],"route":"minor-plot"},{"characterClass":"Resurrect Dead","description":"","portrait":["http://coolvibe.com/wp-content/uploads/2012/10/Fantasy-Art-Jessada-Sutthi-Necromancer.jpg"],"route":"minor-plot"}],"pantheon":[{"characterClass":"Love, beauty - M","description":"","portrait":["https://i.etsystatic.com/8193558/r/il/1109ed/1495784226/il_794xN.1495784226_tg1z.jpg"],"route":"minor-plot"},{"characterClass":"Hatred, vengeance - F","description":"","portrait":["https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/73fd5feb-8a2e-46e3-8ab9-c764280fb325/d94v10j-7630529f-92fa-4db5-be45-4b1666e7072a.jpg?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzczZmQ1ZmViLThhMmUtNDZlMy04YWI5LWM3NjQyODBmYjMyNVwvZDk0djEwai03NjMwNTI5Zi05MmZhLTRkYjUtYmU0NS00YjE2NjZlNzA3MmEuanBnIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.u_TQnR9gtTPRZIkQ-QU990oPKp4Iyh5YzRCgPolzsJM"],"route":"minor-plot"},{"characterClass":"War - M","description":"","portrait":["https://i.pinimg.com/originals/71/57/34/7157349a5bb3c1fc88044cc46e6b5eb4.jpg"],"route":"minor-plot"},{"characterClass":"Death, underworld - F","description":"","portrait":["https://i.pinimg.com/originals/37/23/cb/3723cb89466e5d9355b9efecc536f587.jpg"],"route":"minor-plot"},{"characterClass":"Earth, health, harvest - F","description":"","portrait":["https://i.pinimg.com/736x/1d/91/12/1d9112439d17e25882ff8b2fb6ca61cd.jpg"],"route":"minor-plot"},{"characterClass":"Heaven, storm, hunting, rain - M","description":"","portrait":["http://www.stephaniegobby.com/wp-content/uploads/2018/06/Stephanie-Gobby-Odin.jpg"],"route":"minor-plot"},{"characterClass":"Wine, beer - F","description":"","portrait":["https://i.pinimg.com/236x/84/21/7f/84217f6991323296ef0f6adb7010350c--melanie-delon-fantasy-artwork.jpg"],"route":"minor-plot"},{"characterClass":"Fortune - M","description":"","portrait":["https://i.pinimg.com/736x/e0/5e/18/e05e18b18e85f4dca4ef5de4c07f0ad4.jpg"],"route":"minor-plot"},{"characterClass":"Void - M","description":"","portrait":["https://i.pinimg.com/originals/7f/8a/20/7f8a203b3af1255cd1455112b2b66b43.jpg"],"route":"minor-plot"},{"characterClass":"Deceit - M/F","description":"","portrait":["https://i.pinimg.com/originals/84/44/7c/84447cec5d7ba2cb4d755c379fb2df7b.jpg"],"route":"minor-plot"},{"characterClass":"Disease - F","description":"","portrait":["https://i.pinimg.com/originals/40/13/f3/4013f35449e74c751750db514f729950.jpg"],"route":"minor-plot"}],"locations":[{"characterClass":"Dungeon","description":"Dungeons are subterranean structures that were build with the purpose of locking up prisoners and torture. Because they are underground there are accesses to the exterior through small holes in the ceiling next to the wall, which at the same time it kept fresher air it also let in the rain and small animals like rats and other vermin.","portrait":["http://jdillustration.jimmsdesign.co.uk/images/full-scale-image/blossomtree-dungeon.jpg"],"route":"minor-plot"},{"characterClass":"Castle","description":"","portrait":["https://i.pinimg.com/236x/c5/86/9f/c5869f05d3498bf056fa3cf3dddf5bff--environment-concept-environment-design.jpg"],"route":"minor-plot"},{"characterClass":"House","description":"","portrait":["https://i.pinimg.com/originals/7f/bd/92/7fbd9281cad9f97d35c0e8fc15b91655.jpg"],"route":"minor-plot"},{"characterClass":"Temple","description":"","portrait":["http://41.media.tumblr.com/d6469e24bdc3109374dfd0401275633e/tumblr_nm1tngTBkq1tv3g49o1_500.jpg"],"route":"minor-plot"},{"characterClass":"Maze","description":"","portrait":["https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/1ef81753-8934-493b-8e9a-6323a4632eb6/d85ahb3-ae97f1fd-1f55-4d71-baca-3b7b05b4525d.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzFlZjgxNzUzLTg5MzQtNDkzYi04ZTlhLTYzMjNhNDYzMmViNlwvZDg1YWhiMy1hZTk3ZjFmZC0xZjU1LTRkNzEtYmFjYS0zYjdiMDViNDUyNWQucG5nIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.57XMfpA0lGWnfVyMGkLdO57xVuR24YXXyKkWrsbzbx8"],"route":"minor-plot"},{"characterClass":"Cave","description":"","portrait":["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRk8HtDTQSKIxr3gNAWcuMPJoPHC6LCjh1ii_GQb7Wy8jh1R4p42Q"],"route":"minor-plot"},{"characterClass":"Sewers","description":"","portrait":["https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/58d19be9-76f8-4690-9948-6f0ba24ac53f/d2oa3as-e9acb81e-87b5-4de6-ba29-5ba70fbea89a.jpg?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzU4ZDE5YmU5LTc2ZjgtNDY5MC05OTQ4LTZmMGJhMjRhYzUzZlwvZDJvYTNhcy1lOWFjYjgxZS04N2I1LTRkZTYtYmEyOS01YmE3MGZiZWE4OWEuanBnIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.7n_aBbEDRm89Ou2qe0aciWqI74I_MwsGeZI9uAqgy3k"],"route":"minor-plot"},{"characterClass":"Market","description":"","portrait":["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQiFYo6UYeJhvXw-k-7Ple2S5isjPY213cPWCc5k_0CXbo0XJK3Eg"],"route":"minor-plot"},{"characterClass":"Shrine","description":"A shrine is basically a really small temple. It serves the same religious purpose but doesn't have the facilities to accomodate more than one person","portrait":["https://images.megapixl.com/1239/12392657.jpg"],"route":"minor-plot"},{"characterClass":"Graveyard","description":"","portrait":["https://i.pinimg.com/originals/54/42/cd/5442cd07eb8f767bca7f269607187596.jpg"],"route":"minor-plot"}]},"scenery":[{"type":"scenery","name":"Vines","scenery":true,"description":"","portrait":"https://img1.ak.crunchyroll.com/i/spire3/dbf767346cbb8511013c55dace1025491321331274_full.jpg","saveStat":0,"saveDiff":12,"damage":[0,12]},{"type":"scenery","name":"Lava","scenery":true,"description":"","portrait":"https://vignette.wikia.nocookie.net/finalfantasy/images/6/66/FFIIIDS_Lava_Damage_Floor.png/revision/latest/zoom-crop/width/240/height/240?cb=20101221050526","saveStat":2,"saveDiff":12,"damage":[0,12]},{"type":"scenery","name":"Swinging Pendulum","scenery":true,"description":"","portrait":"https://static.tvtropes.org/pmwiki/pub/images/pANDp_5940.jpg","saveStat":1,"saveDiff":12,"damage":[0,36]},{"type":"scenery","name":"10ft Fall","scenery":true,"description":"","portrait":"https://i.pinimg.com/originals/c0/71/71/c07171035a4309af89c1f57308eca977.jpg","saveStat":1,"saveDiff":12,"damage":[0,6]},{"type":"scenery","name":"25ft Fall","scenery":true,"description":"","portrait":"https://i.pinimg.com/originals/c0/71/71/c07171035a4309af89c1f57308eca977.jpg","saveStat":1,"saveDiff":12,"damage":[7,16]},{"type":"scenery","name":"50ft Fall","scenery":true,"description":"","portrait":"https://i.pinimg.com/originals/c0/71/71/c07171035a4309af89c1f57308eca977.jpg","saveStat":1,"saveDiff":12,"damage":[20,45]},{"type":"scenery","name":"Spiked Pit","scenery":true,"description":"","portrait":"https://cdnb.artstation.com/p/assets/images/images/010/376/701/large/joel-lopez-spiked-pit-copy.jpg?1524088001","saveStat":1,"saveDiff":12,"damage":[0,10]},{"type":"scenery","name":"Poison Gas Cloud","scenery":true,"description":"","portrait":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQj5jjgFnvMBW8y62qp4nnPmP_VhMDdjPSyF6EdE-3oPbvJl-ME","saveStat":2,"saveDiff":12,"damage":[6,12]},{"type":"scenery","name":"Arrow Trap","scenery":true,"description":"","portrait":"https://cdnb.artstation.com/p/assets/images/images/001/950/929/large/dimas-wijil-pamungkas-arrow-barrage-by-happysadcorner-d9gddnq.jpg?1455046628","saveStat":1,"saveDiff":12,"damage":[0,12]},{"type":"scenery","name":"Crushing Trap","scenery":true,"description":"","portrait":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTKLcPsfZiDsj4o5SdZvk1Rwj9r7zG_Q2Z-_JobOobhDx__BYZh","saveStat":1,"saveDiff":12,"damage":[0,200]},{"type":"scenery","name":"Rolling Boulder","scenery":true,"description":"","portrait":"https://cf.geekdo-images.com/camo/f8829192ef94ed1ea8e1c3e720a738f0514b5182/687474703a2f2f637269746963616c2d686974732e636f6d2f77702d636f6e74656e742f75706c6f6164732f323031312f30342f646e645f74726170732e6a7067","saveStat":3,"saveDiff":12,"damage":[0,200]},{"type":"scenery","name":"Drowning","scenery":true,"description":"","portrait":"https://i.pinimg.com/originals/c0/fd/bf/c0fdbf5839187f979f4862687a5824d7.png","saveStat":3,"saveDiff":10,"damage":[0,10]},{"type":"scenery","name":"Spider Web","scenery":true,"description":"","portrait":"https://cache.desktopnexus.com/thumbseg/451/451906-bigthumbnail.jpg","saveStat":0,"saveDiff":12,"damage":[0,0]},{"type":"scenery","name":"Fire","scenery":true,"description":"","portrait":"https://staticdelivery.nexusmods.com/mods/1704/images/thumbnails/78709-0-1473783976.png","saveStat":1,"saveDiff":12,"damage":[6,12]},{"type":"scenery","name":"Blades Trap","scenery":true,"description":"","portrait":"https://gamepedia.cursecdn.com/zelda_gamepedia_en/9/99/Blade_Trap.png","saveStat":1,"saveDiff":12,"damage":[0,30]},{"type":"scenery","name":"Acid Trap","scenery":true,"description":"","portrait":"https://s3.amazonaws.com/files.d20.io/marketplace/44825/56-uB4LDN9_sR2_RKYxkUQ/max.png?1410877712","saveStat":2,"saveDiff":12,"damage":[0,12]},{"type":"scenery","name":"Spiked Concoction","scenery":true,"description":"","portrait":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQe0g2irTVPQLovPabAzub-iwWc71zk9AILDYWPGECTVAUhsndQ8Q","saveStat":1,"saveDiff":12,"damage":[0,40]},{"type":"scenery","name":"Falling Rocks","scenery":true,"description":"","portrait":"https://i.ytimg.com/vi/ahvpyv_cPFI/maxresdefault.jpg","saveStat":1,"saveDiff":12,"damage":[6,20]},{"type":"scenery","name":"Falling Tree","scenery":true,"description":"","portrait":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTqu6I9C3cSUhbk4SMEc6FWd0R087Jq3oLtwe2iwCfghyqXaqvE","saveStat":1,"saveDiff":12,"damage":[0,15]},{"type":"scenery","name":"Frost Wind","scenery":true,"description":"","portrait":"https://gamepedia.cursecdn.com/scrolls_gamepedia/a/a0/Frost_Wind_%28art%29.png?version=33f81af7410c82df6da3ec90546a30bf","saveStat":2,"saveDiff":12,"damage":[10,15]}],"npcs":[{"name":"","type":"creature","gender":"","territory":["town"],"characterClass":"ShopKeeper","index":null,"description":"<p>Shopkeepers are spread around the world and are as varied in the way they look as they are on behaviour. Their wares come from...</p><p>The prices tend to go up and down</p>","portrait":{"male":"https://i.pinimg.com/originals/01/3f/50/013f50b4f872aa094b76659120594f60.jpg","female":"https://cdnb.artstation.com/p/assets/covers/images/009/943/009/20180322002043/smaller_square/julia-yurtsev-shopkeeper-02.jpg?1521696043"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["town"],"characterClass":"Blacksmith","index":null,"description":"","portrait":{"male":"https://f4.bcbits.com/img/a3074138221_10.jpg","female":"https://i.pinimg.com/originals/b1/5f/1f/b15f1f42feac85d9ae1e80c083c54a27.jpg"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["town"],"characterClass":"InnKeeper","index":null,"description":"","portrait":{"male":"https://i.pinimg.com/originals/2b/ff/6d/2bff6daf654db10df00ee401c47e4801.jpg","female":"https://vignette.wikia.nocookie.net/witcher/images/1/15/Tw3_elsa.png/revision/latest?cb=20180106172046"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["town"],"characterClass":"Inn Servant","index":null,"description":"","portrait":{"female":"https://i.pinimg.com/originals/4a/19/a9/4a19a912454c8ea1d96e7a3649cb5e33.jpg","male":"https://i.pinimg.com/originals/4d/0e/0b/4d0e0b8ff0d907c95a94295854187023.jpg"},"alias":"the Squeaky","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["town","court"],"characterClass":"Prostitute","index":null,"description":"","portrait":{"female":"https://i.pinimg.com/originals/18/10/e0/1810e0bdf0d44ed37e74adfb623db657.png","male":"https://i.pinimg.com/originals/52/89/29/528929299074f20e2bb3696df6208056.jpg"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","desert","jungle","town","dimension","court"],"characterClass":"Guard","index":null,"description":"","portrait":{"male":"https://vignette.wikia.nocookie.net/moon-guard/images/d/d3/A7c7259ef6050e967a93aa799d2d685d--fantasy-male-digital-portrait.jpg/revision/latest?cb=20171224092829","female":"https://i.pinimg.com/originals/44/4b/bf/444bbf7c6d002c1c3082fb218d00f4a1.jpg"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","desert","steppes","jungle","town","dimension","court"],"characterClass":"Villain","index":null,"description":"","portrait":{"male":"https://i.redd.it/r0q7hntf8ya11.jpg","female":"https://i.pinimg.com/originals/68/5f/7f/685f7f1a5c3f8290948ab4d3da900b3e.jpg"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","desert","sea","frozen","steppes","jungle","town","dimension","court"],"characterClass":"Thief","index":null,"description":"","portrait":{"male":"https://i.pinimg.com/originals/5c/3a/ce/5c3aceff2142026f41dcace98fa51b0a.jpg","female":"https://i.pinimg.com/236x/84/93/65/849365a01ced0d131c37112d4021f66f--character-concept-art-character-portraits.jpg"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["town","court"],"characterClass":"Noble","index":null,"description":"","portrait":{"male":"https://i.pinimg.com/originals/83/de/d5/83ded529d8d6c94539c30ea61e46bd19.jpg","female":"https://i.warosu.org/data/tg/img/0287/82/1386713571361.jpg"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","desert","sea","steppes","jungle","town","dimension","court"],"characterClass":"Commoner","index":null,"description":"","portrait":{"male":"https://i.pinimg.com/originals/45/ef/37/45ef37cfe0bcf67a0bd607dc72a47a99.jpg","female":"https://i.pinimg.com/originals/23/22/22/2322220457d9a9106801ad38e8d5d2a7.jpg"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","frozen","jungle","dimension"],"characterClass":"Tribe Leader","index":null,"description":"","portrait":{"male":"https://i.pinimg.com/originals/6b/61/87/6b618706f6a9a9dfea1d34fd4f616c96.jpg","female":"https://i.pinimg.com/736x/f9/5c/f0/f95cf06b606f5e9af3b1b01dd20fb98e.jpg"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","frozen","jungle","dimension"],"characterClass":"Clansman","index":null,"description":"","portrait":{"male":"https://i.pinimg.com/originals/7a/6e/5b/7a6e5b27f0835ca5aed6cf9b48dfa6e4.jpg","female":"https://i.pinimg.com/736x/2a/34/0b/2a340b056bf8ca3b958360b23b0c7c80.jpg"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["town","court"],"characterClass":"Monarch","index":null,"description":"","portrait":{"male":"https://i.pinimg.com/originals/47/e4/b1/47e4b16630a9c97946cbfdc8180dcc7c.jpg","female":"https://vignette.wikia.nocookie.net/worlds-divided/images/5/5d/46322_1371463565.jpg/revision/latest?cb=20140913002518"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","sea","frozen","desert","jungle","town","dimension","court"],"characterClass":"Priest","index":null,"description":"","portrait":{"male":"https://vignette.wikia.nocookie.net/damo/images/a/a6/F46368bbf952cf70a28ed091161f4f6f--fantasy-rpg-fantasy-priest.jpg/revision/latest?cb=20170921195417","female":"https://cdnb.artstation.com/p/assets/images/images/003/466/035/large/andy-lamarca-final-small.jpg?1473971995"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","sea","desert","frozen","jungle","town","dimension","court"],"characterClass":"Sorcerer","index":null,"description":"","portrait":{"male":"https://cdna.artstation.com/p/assets/images/images/010/803/308/large/bernardo-hasselmann-eldrinportrait.jpg?1526320680","female":"https://cdnb.artstation.com/p/assets/images/images/005/284/743/large/istvan-straban-sorceress-net-istvan-straban.jpg?1489929190"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["town"],"characterClass":"Beggar","index":null,"description":"","portrait":{"male":"http://3.bp.blogspot.com/-wTnXKzaaCjA/Ta5K_JJinCI/AAAAAAAAAME/IWoh_zDSLv0/s1600/oldman.jpg","female":"https://i.pinimg.com/originals/f4/8f/f2/f48ff2780416bb3ca26244376c332576.jpg"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","sea","frozen","steppes","jungle","dimension"],"characterClass":"Witch","index":null,"description":"","portrait":{"female":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS4ye3uM1nCic-loIAVHtYgnK_Xzt5uDx_zH_Wy0owIYJoRElQl","male":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS4ye3uM1nCic-loIAVHtYgnK_Xzt5uDx_zH_Wy0owIYJoRElQl"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]}],"creatures":[{"name":"","type":"creature","description":"","portrait":{"female":"https://josephvargo.com/images/09_Sword-and-Sorcery/Caveman.jpg","male":"https://josephvargo.com/images/09_Sword-and-Sorcery/Caveman.jpg"},"gender":"","territory":["dungeon","mountains","steppes","frozen","jungle"],"characterClass":"Dek","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"<p>A Dragon is, basically speaking, a very large reptilian that for some reason has managed to grow to disproportionate size. They are instinctive, savage, incredibly strong and fast. Not many people live to tell the story when they encounter a Dragon, as they reach speeds of 100ft per second and capable of jumping to up to 40ft.</p><p>According to folklore Dragons are capable of flight and breathe fire, which isn't true. Not that this makes them less lethal. They use their tonge to taste the air for prey and locate their target from even the most obscure hidden places. The question is not if the Dragon will find you, but more why is it taking so long to kill you.</p><p>They are cold blooded, so they prefer basking in the sun rather than living in the dark. They inhabit caves but their only predators are giant rocs, and only in their infancy</p><p>A Dragon's reproductive cycle lasts a few years and their eggs are quite valuable if brought in intact</p><p>They are incapable of speech and can't be domesticated, although some tribes have submitted sacrifices to them in order to appease them, they will eat anything within their reach before they retire to digest their prey</p><p>Although it is not unknown for an individual to claim to have killed a Dragon, the only stories that can be believed come from people who are either terribly mangled (them being the lucky ones in their group) or people who have used their wits and their environment to their advantage, as a direct confrontation with a Dragon most certainly spells death.</p><p>Luckily for everybody Dragons live in isolated areas, as most life prefers to stir away from their turf. As such they are very territorial and precious of their scarce prey, so unless for it is for reproduction, Dragons are quite good at killing each other, and they never let the corpses of their kin to go to waste.</p><p>Their habitat is quite varied, and you can find them pretty much anywhere except in the frozen areas, it being too cold for them.</p><p>Dragons tend to live in places littered with weapons, armor, skeletons and more than a few coins. They don't have use for these things, yet they naturally end there from the hundreds of adventurers whose stupidity led them to try their luck at hunting these giant lizards.","portrait":{"female":"https://img00.deviantart.net/5fb1/i/2010/014/4/b/lizard_by_akiman.jpg","male":"https://img00.deviantart.net/5fb1/i/2010/014/4/b/lizard_by_akiman.jpg"},"name":"","type":"creature","gender":"","territory":["forest","mountains","jungle","sea","steppes","town","dimension"],"characterClass":"Dragon","index":null,"alias":"","age":26,"stats":{"str":60,"dex":40,"con":70,"sta":30,"app":12,"pow":13},"martialProwess":7,"damageBonus":20,"defenseValue":22,"hitpoints":350,"tempHitpoints":700,"sanity":50,"charisma":12,"actions":[{"name":"Attack"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/64/30/a7/6430a71efea4d8f3939035239a6105a1.jpg","male":"https://i.pinimg.com/originals/64/30/a7/6430a71efea4d8f3939035239a6105a1.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","mountains","steppes","town","dimension"],"characterClass":"Winged Horror","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/f3/2a/6a/f32a6a6d450f38908b341cac2f3a14bf.jpg","male":"https://i.pinimg.com/originals/f3/2a/6a/f32a6a6d450f38908b341cac2f3a14bf.jpg"},"name":"","type":"creature","gender":"","territory":["forest","mountains","frozen","steppes"],"characterClass":"Dire Wolf","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"http://www.imarvintpa.com/Mapping/Monster%20Portraits/Yuan-Ti%203.png","male":"http://www.imarvintpa.com/Mapping/Monster%20Portraits/Yuan-Ti%203.png"},"name":"","type":"creature","gender":"","territory":["dungeon","jungle","desert","dimension"],"characterClass":"Snake Man","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"http://fc05.deviantart.net/fs42/i/2009/156/6/f/KumpeeSigha__Croc_Lion__Male_by_Gandharvasstudio.jpg","male":"http://fc05.deviantart.net/fs42/i/2009/156/6/f/KumpeeSigha__Croc_Lion__Male_by_Gandharvasstudio.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","jungle"],"characterClass":"Crocodile","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"http://www.howarddavidjohnson.com/Fafnir_the_Frost_Giant_.jpg","male":"http://www.howarddavidjohnson.com/Fafnir_the_Frost_Giant_.jpg"},"name":"","type":"creature","gender":"","territory":["forest","mountains","frozen","steppes"],"characterClass":"Giant","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://dialecticanalyticalman.files.wordpress.com/2016/11/cyclops-2.jpg","male":"https://dialecticanalyticalman.files.wordpress.com/2016/11/cyclops-2.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","jungle","sea","dimension"],"characterClass":"Cyclops","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/00/a7/43/00a7432349887250c592fc8b35068b5a.jpg","male":"https://i.pinimg.com/originals/00/a7/43/00a7432349887250c592fc8b35068b5a.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","jungle"],"characterClass":"Giant Toad","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.ebayimg.com/images/g/y8oAAOSwvgdW2y-T/s-l300.jpg","male":"https://i.ebayimg.com/images/g/y8oAAOSwvgdW2y-T/s-l300.jpg"},"name":"","type":"creature","gender":"","territory":["jungle"],"characterClass":"Panther","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/26/c4/55/26c4559b1fdfcd753ac739aec6195045.jpg","male":"https://i.pinimg.com/originals/26/c4/55/26c4559b1fdfcd753ac739aec6195045.jpg"},"name":"","type":"creature","gender":"","territory":["jungle"],"characterClass":"Tiger","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"http://www.epilogue.net/sites/default/files/imagecache/gallery_lg/images/08/33/41075_1218513600.jpg","male":"http://www.epilogue.net/sites/default/files/imagecache/gallery_lg/images/08/33/41075_1218513600.jpg"},"name":"","type":"creature","gender":"","territory":["mountains","frozen","steppes"],"characterClass":"Mammoth","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://img00.deviantart.net/c5ad/i/2014/321/6/5/sabretooth_pounce_by_concept_art_house-d1if245.jpg","male":"https://img00.deviantart.net/c5ad/i/2014/321/6/5/sabretooth_pounce_by_concept_art_house-d1if245.jpg"},"name":"","type":"creature","gender":"","territory":["mountains","steppes","frozen","jungle"],"characterClass":"Sabretooth","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://cdn130.picsart.com/239044225047202.jpg?r1024x1024","male":"https://cdn130.picsart.com/239044225047202.jpg?r1024x1024"},"name":"","type":"creature","gender":"","territory":["steppes","jungle","desert"],"characterClass":"Lion","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://pre00.deviantart.net/129f/th/pre/i/2012/250/8/1/war_elephant_by_sugarsart-d5dw7v4.jpg","male":"https://pre00.deviantart.net/129f/th/pre/i/2012/250/8/1/war_elephant_by_sugarsart-d5dw7v4.jpg"},"name":"","type":"creature","gender":"","territory":["steppes","desert","jungle"],"characterClass":"Elephant","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/2c/33/72/2c33724d16c65c746104c08f53e9cc51.jpg","male":"https://i.pinimg.com/originals/2c/33/72/2c33724d16c65c746104c08f53e9cc51.jpg"},"name":"","type":"creature","gender":"","territory":["forest","jungle"],"characterClass":"Boar","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://vignette.wikia.nocookie.net/bloodrealm/images/2/2f/CarnivorousPlant.png/revision/latest?cb=20140320205231","male":"https://vignette.wikia.nocookie.net/bloodrealm/images/2/2f/CarnivorousPlant.png/revision/latest?cb=20140320205231"},"name":"","type":"creature","gender":"","territory":["forest","jungle","dimension"],"characterClass":"Flesh eating Plant","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"http://www.bergsma.com/images/T/522.jpg","male":"http://www.bergsma.com/images/T/522.jpg"},"name":"","type":"creature","gender":"","territory":["mountains","steppes"],"characterClass":"Mountain Lion","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/9b/df/3c/9bdf3cdc5cb16cce57a8ccae1b4cd385.jpg","male":"https://i.pinimg.com/originals/9b/df/3c/9bdf3cdc5cb16cce57a8ccae1b4cd385.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","desert","jungle","dimension"],"characterClass":"Giant Snake","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/ce/86/ac/ce86ac15466c16875efbbf7df87bbe8b.jpg","male":"https://i.pinimg.com/originals/ce/86/ac/ce86ac15466c16875efbbf7df87bbe8b.jpg"},"name":"","type":"creature","gender":"","territory":["forest","mountains","frozen","steppes"],"characterClass":"Wolf","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://vignette.wikia.nocookie.net/dragonfantasysaga/images/f/f4/Inimigo_-_Imperial_Necromancer.jpg/revision/latest?cb=20130802203741","male":"https://vignette.wikia.nocookie.net/dragonfantasysaga/images/f/f4/Inimigo_-_Imperial_Necromancer.jpg/revision/latest?cb=20130802203741"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","desert","jungle","town","dimension"],"characterClass":"Necromancer","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://static1.squarespace.com/static/51b3dc8ee4b051b96ceb10de/t/5429785ee4b047c33e155a12/1412003936853/medieval-skeleton-warrior-art-by-markus-neidel","male":"https://static1.squarespace.com/static/51b3dc8ee4b051b96ceb10de/t/5429785ee4b047c33e155a12/1412003936853/medieval-skeleton-warrior-art-by-markus-neidel"},"name":"","type":"creature","gender":"","territory":["dungeon","steppes","frozen","jungle","sea","dimension"],"characterClass":"Skeleton Warrior","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/e4/84/e9/e484e9b8a5e9c988f829639a6449ce76.jpg","male":"https://i.pinimg.com/originals/e4/84/e9/e484e9b8a5e9c988f829639a6449ce76.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","frozen","steppes","sea","desert","jungle","town","dimension"],"characterClass":"Zombie","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/2b/a2/72/2ba272fbe6a7145c3410113bff0e4e3b.jpg","male":"https://i.pinimg.com/originals/2b/a2/72/2ba272fbe6a7145c3410113bff0e4e3b.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","town","mountains","dimension","court"],"characterClass":"Vampire","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"http://s1.1zoom.me/big0/725/Ghost_Night_Street_510992.jpg","male":"http://s1.1zoom.me/big0/725/Ghost_Night_Street_510992.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","frozen","steppes","sea","desert","jungle","town","dimension","court"],"characterClass":"Ghost","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://pm1.narvii.com/6622/fc5efc93792b6c2f7b3abd6e9c21814c3f2c7684_hq.jpg","male":"https://pm1.narvii.com/6622/fc5efc93792b6c2f7b3abd6e9c21814c3f2c7684_hq.jpg"},"name":"","type":"creature","gender":"","territory":["forest","mountains","frozen","steppes","desert","jungle"],"characterClass":"Skinwalker","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/8d/24/01/8d240171d77ef310f903b85f154e470a.jpg","male":"https://i.pinimg.com/originals/8d/24/01/8d240171d77ef310f903b85f154e470a.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","frozen","steppes","town","court"],"characterClass":"Werewolf","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://www.artranked.com/images/8b/8baf5e7da3162f26a6b977478d5c83a2.jpg","male":"https://www.artranked.com/images/8b/8baf5e7da3162f26a6b977478d5c83a2.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","mountains","desert","jungle","dimension"],"characterClass":"Mummy","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/a2/eb/af/a2ebafbd8202b2fb4578a19612a31335.jpg","male":"https://i.pinimg.com/originals/a2/eb/af/a2ebafbd8202b2fb4578a19612a31335.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","frozen","sea","desert","jungle","town","dimension","court"],"characterClass":"Cult Leader","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://www.frontlinegaming.org/wp-content/uploads/2016/01/chaos_cultist_by_slipgatecentral.jpg","male":"https://www.frontlinegaming.org/wp-content/uploads/2016/01/chaos_cultist_by_slipgatecentral.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","frozen","sea","desert","jungle","town","dimension","court"],"characterClass":"Cultist","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://s-media-cache-ak0.pinimg.com/736x/a2/85/ab/a285ab86539f573f657384209fc40420--bear-illustration-fantasy-illustration.jpg","male":"https://s-media-cache-ak0.pinimg.com/736x/a2/85/ab/a285ab86539f573f657384209fc40420--bear-illustration-fantasy-illustration.jpg"},"name":"","type":"creature","gender":"","territory":["forest","mountains","frozen","steppes"],"characterClass":"Bear","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://cdna.artstation.com/p/assets/images/images/010/147/732/large/alejandro-olmedo-terodactyl-hd-logo.jpg?1522830112","male":"https://cdna.artstation.com/p/assets/images/images/010/147/732/large/alejandro-olmedo-terodactyl-hd-logo.jpg?1522830112"},"name":"","type":"creature","gender":"","territory":["mountains","steppes","jungle","dimension"],"characterClass":"Pterodactyl","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/08/c3/6c/08c36c52617284113f30fd247f756b2b.jpg","male":"https://i.pinimg.com/originals/08/c3/6c/08c36c52617284113f30fd247f756b2b.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","desert","jungle","dimension"],"characterClass":"Giant Spider","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://horror.ambient-mixer.com/images_template/9/d/6/9d69187695b6bf111a13245dd0b81926_full.jpg","male":"https://horror.ambient-mixer.com/images_template/9/d/6/9d69187695b6bf111a13245dd0b81926_full.jpg"},"name":"","type":"creature","gender":"","territory":["mountains","steppes","desert","dimension"],"characterClass":"Locusts Swarm","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"male":"https://i.pinimg.com/474x/87/4f/9d/874f9d091bcc956277fdf0b1eb8b4c91--fantasy-monster-cthulhu-mythos.jpg","female":"https://i.pinimg.com/originals/e5/3f/6f/e53f6fa552f4a026c95c47605e37c2ba.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","jungle","sea","town","dimension"],"characterClass":"Deep One","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Claw","mp":0,"range":5,"damage":[4,8,12]},{"name":"Bite","mp":0,"range":5,"damage":[4,8,12]},{"name":"Trident","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/93/f6/f7/93f6f75ebb63306d9577baa187ae15cb.jpg","male":"https://i.pinimg.com/originals/93/f6/f7/93f6f75ebb63306d9577baa187ae15cb.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","mountains","frozen","jungle","town","dimension"],"characterClass":"Formless horror","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://vignette.wikia.nocookie.net/the-legendary-moonlight-sculptor/images/d/df/Shadow.jpg/revision/latest?cb=20150921110101","male":"https://vignette.wikia.nocookie.net/the-legendary-moonlight-sculptor/images/d/df/Shadow.jpg/revision/latest?cb=20150921110101"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","frozen","mountains","steppes","desert","jungle","frozen","town","dimension","court"],"characterClass":"Shadow Creeper","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://c.wallhere.com/photos/3f/1d/artwork_fantasy_art_dead_demon_redhead-68416.jpg!d","male":"https://ksr-ugc.imgix.net/assets/011/526/715/6154c9ffe5d9ad083d057e4cae1f9a94_original.jpg?ixlib=rb-2.0.0&crop=faces&w=1552&h=873&fit=crop&v=1463684011&auto=format&frame=1&q=92&s=06b9de34eb39c0eb1b833d16c700d421"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","frozen","steppes","sea","desert","jungle","frozen","town","dimension","court"],"characterClass":"Demon","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/a6/7d/3d/a67d3d8f945844818fd751ea735095fe.jpg","male":"https://i.pinimg.com/originals/a6/7d/3d/a67d3d8f945844818fd751ea735095fe.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","mountains","frozen","sea","jungle","frozen","dimension"],"characterClass":"Kraken","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/ee/b1/f4/eeb1f41f241a694b9e2b7a7098891cc9.jpg","male":"https://i.pinimg.com/originals/ee/b1/f4/eeb1f41f241a694b9e2b7a7098891cc9.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","town","dimension","court"],"characterClass":"Mimic","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","mp":0,"range":5,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/a1/e3/2e/a1e32e9ef22c7bd466c56cc067d80656.jpg","male":"https://cdna.artstation.com/p/assets/images/images/006/202/534/large/olga-kolesnikova-incubus5.jpg?1496772183"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","sea","desert","jungle","town","dimension","court"],"characterClass":"Succubus/Incubus","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"male":"https://i.pinimg.com/originals/98/5a/00/985a005ff1245e7ad3a330d1805242bf.jpg","female":"https://i.pinimg.com/736x/d6/07/ae/d607ae60170b210aa2cbe634616a0494.jpg"},"name":"","type":"creature","gender":"","territory":["forest","steppes","jungle","dimension"],"characterClass":"Hunting Thorn","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/12ac6727-eea5-4504-b8e4-d2e822342075/d4ewqxk-c77a8df8-33ab-4c51-af7c-b710a7f1d1a3.jpg?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzEyYWM2NzI3LWVlYTUtNDUwNC1iOGU0LWQyZTgyMjM0MjA3NVwvZDRld3F4ay1jNzdhOGRmOC0zM2FiLTRjNTEtYWY3Yy1iNzEwYTdmMWQxYTMuanBnIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.dsxUkuM-7sK01CE8xuD0vqbH3A7y71Z7beHdeOH9cgw","male":"https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/12ac6727-eea5-4504-b8e4-d2e822342075/d4ewqxk-c77a8df8-33ab-4c51-af7c-b710a7f1d1a3.jpg?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzEyYWM2NzI3LWVlYTUtNDUwNC1iOGU0LWQyZTgyMjM0MjA3NVwvZDRld3F4ay1jNzdhOGRmOC0zM2FiLTRjNTEtYWY3Yy1iNzEwYTdmMWQxYTMuanBnIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.dsxUkuM-7sK01CE8xuD0vqbH3A7y71Z7beHdeOH9cgw"},"name":"","type":"creature","gender":"","territory":["forest","mountains","jungle","dimension"],"characterClass":"Dendro Beast","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/1f/04/e4/1f04e4afdf7fab693e801c2bb32213e2.jpg","male":"https://i.pinimg.com/originals/1f/04/e4/1f04e4afdf7fab693e801c2bb32213e2.jpg"},"name":"","type":"creature","gender":"","territory":["forest","mountains","steppes","frozen","town","dimension"],"characterClass":"Giant Roc","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"male":"https://pbs.twimg.com/media/DpEbF_UU0AA8kfm.jpg","female":"https://i.pinimg.com/originals/18/f6/a6/18f6a63d597ddfde48829e76c8d926ca.png"},"name":"","type":"creature","gender":"","territory":["dungeon","mountains","desert","dimension"],"characterClass":"Minotaur","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":50,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]}]};
+module.exports = {"environment":{"title":"Ravenstorm","font-family":"","background":"","blurb":"","plots":[{"characterClass":"Minor Urban Plot","territory":"town","description":"","portrait":["https://rpg.ambient-mixer.com/images_template/f/1/7/f1763e12d49d3ef38278fb3473f1ec16_full.jpg"],"route":"minor-plot"},{"characterClass":"Minor Forest Plot","territory":"forest","description":"","portrait":["https://i.pinimg.com/originals/6f/c6/d5/6fc6d561028d946f08c98148c1f1a8f3.jpg"],"route":"minor-plot"},{"characterClass":"Minor Desert Plot","territory":"desert","description":"","portrait":["https://i.pinimg.com/originals/0a/9e/e2/0a9ee2a5e42bb5f24a4d0bd8a2652767.jpg"],"route":"minor-plot"},{"characterClass":"Minor Steppes Plot","territory":"steppes","description":"","portrait":["https://cdnb.artstation.com/p/assets/images/images/011/024/203/large/amos-yan-ffxiv-bg-speedpaint.jpg?1527488177"],"route":"minor-plot"},{"characterClass":"Minor Jungle Plot","territory":"jungle","description":"","portrait":["https://i.pinimg.com/originals/dd/3f/46/dd3f4621c91e3401e555cf4a42204021.jpg"],"route":"minor-plot"},{"characterClass":"Minor Mountains Plot","territory":"mountains","description":"","portrait":["https://i.pinimg.com/736x/ef/f0/5b/eff05b35bb0824467634372d81d8550a.jpg"],"route":"minor-plot"},{"characterClass":"Minor Arctic Plot","territory":"frozen","description":"","portrait":["https://fiverr-res.cloudinary.com/images/t_main1,q_auto,f_auto/gigs/121935800/original/ec72e33327ce1f7f85fb9d5a1ab3edaef4c6de55/draw-illustration-for-you.jpg"],"route":"minor-plot"},{"characterClass":"Minor Interdimension Plot","territory":"dimension","description":"","portrait":["https://i.pinimg.com/originals/d0/d5/12/d0d512fa230d9162b52111be3c28ab1a.jpg"],"route":"minor-plot"},{"characterClass":"Minor Court Plot","territory":"noble court","description":"","portrait":["https://i.pinimg.com/originals/bf/0d/a1/bf0da11a8607b210706bb2e2c85502a3.jpg"],"route":"minor-plot"},{"characterClass":"Minor Dungeon Plot","territory":"dungeon","description":"","portrait":["https://i.pinimg.com/originals/ad/48/47/ad48473365ace99a8ccf26ebd6ff6543.jpg"],"route":"minor-plot"},{"characterClass":"Minor Sea Plot","territory":"sea","description":"","portrait":["https://i.pinimg.com/originals/82/cc/cc/82cccc8ea52b5936e407aff6be29fc83.jpg"],"route":"minor-plot"}],"inventory":[{"characterClass":"Gold Piece","description":"","portrait":["https://i.pinimg.com/originals/ef/4a/3c/ef4a3c259a7bc796b8ee10755713b611.jpg"],"route":"minor-plot"},{"characterClass":"Silver Piece","description":"","portrait":["http://nebula.wsimg.com/13db16fd8005e2fd0f7e0e541a76c233?AccessKeyId=ACFBBC4C4391ACA1C912&disposition=0&alloworigin=1"],"route":"minor-plot"},{"characterClass":"Copper Piece","description":"","portrait":["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRHpFOn3hRgszpPwxrbq1D5bjFsKF4vjhyd3U9CPzbal5NzF0H6yA"],"route":"minor-plot"},{"characterClass":"Bandage","description":"","portrait":["https://vignette.wikia.nocookie.net/granblue/images/4/4e/Ancient_Bandages.png/revision/latest/scale-to-width-down/600?cb=20161007002920"],"route":"minor-plot"},{"characterClass":"Bread","description":"","portrait":["https://img.freepik.com/free-vector/freshly-baked-multigrain-bread-hand-drawn-illustration_53876-2662.jpg?size=338&ext=jpg"],"route":"minor-plot"},{"characterClass":"Bacon","description":"","portrait":["https://i.etsystatic.com/10185029/r/il/7ddc49/1558175531/il_794xN.1558175531_hs99.jpg"],"route":"minor-plot"},{"characterClass":"Dried Meat","description":"","portrait":["https://image.shutterstock.com/image-photo/drycured-pork-sketch-illustration-on-260nw-1339716011.jpg"],"route":"minor-plot"},{"characterClass":"Pickled Cabbage","description":"","portrait":["https://st.depositphotos.com/1701169/4601/v/950/depositphotos_46013803-stock-illustration-a-jar-of-pickled-fresh.jpg"],"route":"minor-plot"},{"characterClass":"Stew","description":"","portrait":["https://i.pinimg.com/originals/a2/68/e8/a268e86b68b15ca1828d98297cb6c6cb.jpg"],"route":"minor-plot"},{"characterClass":"Sausages","description":"","portrait":["https://static.vecteezy.com/system/resources/thumbnails/000/383/526/small/dw2-noon-sasi-37-03-gastropub.jpg"],"route":"minor-plot"},{"characterClass":"Roast Chicken","description":"","portrait":["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSvf5U51TpjHxCpE9mqxPkFPKQtAL7O7Hzm3JFxQrDAmML3fY6j"],"route":"minor-plot"},{"characterClass":"Steak","description":"","portrait":["https://as2.ftcdn.net/jpg/01/92/99/71/500_F_192997190_vGoyYbXleWot8bQGdaZWHoyoHyMbwBnh.jpg"],"route":"minor-plot"},{"characterClass":"Wine","description":"","portrait":["https://i.pinimg.com/originals/1d/eb/99/1deb99c7bb166f357e2e6db088e92faa.jpg"],"route":"minor-plot"},{"characterClass":"Beer","description":"","portrait":["https://i.pinimg.com/originals/83/b3/fb/83b3fb93f689f36021fe9dc1477bbf7e.jpg"],"route":"minor-plot"},{"characterClass":"Giant's Beer","description":"","portrait":["https://cdna.artstation.com/p/assets/images/images/002/988/372/large/andre-meister-andremeister-dwarf.jpg?1468183720"],"route":"minor-plot"},{"characterClass":"Mead","description":"","portrait":["https://thumbs.dreamstime.com/z/barrel-11050360.jpg"],"route":"minor-plot"},{"characterClass":"Grog","description":"","portrait":["http://www.steveonsteins.com/wp-content/uploads/2010/05/1882-Woodcut-Glass-Drinking-Horn-Iron-Age-Archaeological-Item-Prehistoric-Tool-337x450.jpg"],"route":"minor-plot"},{"characterClass":"Honey","description":"","portrait":["https://banner2.kisspng.com/20180224/aaq/kisspng-honey-drawing-watercolor-painting-illustration-honey-5a91e939b43402.9367058415195118657381.jpg"],"route":"minor-plot"}],"weaponry":[{"characterClass":"Battle Axe","description":"","type":"Melee","portrait":["https://cdn.conceptartempire.com/images/11/3090/03-warhammer-ax.jpg"],"route":"minor-plot"},{"characterClass":"Ulfberht","description":"","type":"Melee","portrait":["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR6GTWwwBCdmy1lXRpkKL3ew0I6-anRgtWAIQnQoLm8T5uG0ZwfQg"],"route":"minor-plot"},{"characterClass":"Gladius","description":"","type":"Melee","portrait":["https://mcishop.azureedge.net/mciassets/w_2_0011855_short-ancient-roman-gladius-larp-sword_550.png"],"route":"minor-plot"},{"characterClass":"Long Sword","description":"","type":"Melee","portrait":["https://mocah.org/thumbs/4524717-war-sword-of-atlantis-conan-the-barbarian.jpg"],"route":"minor-plot"},{"characterClass":"Spiked Club","description":"","type":"Melee","portrait":["https://i.pinimg.com/originals/87/6f/f9/876ff9112486078a9eb4dcf2b7a348c7.jpg"],"route":"minor-plot"},{"characterClass":"Spear","description":"","type":"Melee","portrait":["https://image.shutterstock.com/image-vector/vector-image-fantasy-weapon-spear-260nw-1210366759.jpg"],"route":"minor-plot"},{"characterClass":"Staff","description":"","type":"Melee","portrait":["https://cdnb.artstation.com/p/assets/images/images/011/245/477/large/kara-woods-stx-final.jpg?1532734767"],"route":"minor-plot"},{"characterClass":"Dagger","description":"","type":"Melee","portrait":["http://www.chroniclebooks.com/blog/wp-content/uploads/Final_dagger.jpg"],"route":"minor-plot"},{"characterClass":"Sling","description":"","type":"Melee","portrait":["https://cdn.shopify.com/s/files/1/1004/9126/products/Titan_Sling_Top.jpg?v=1516412403"],"route":"minor-plot"},{"characterClass":"Atlatl","description":"","type":"Melee","portrait":["https://collectionapi.metmuseum.org/api/collection/v1/iiif/315225/659089/main-image"],"route":"minor-plot"},{"characterClass":"Bow","description":"","type":"Melee","portrait":["https://www.pngkey.com/png/detail/38-385968_clip-art-library-stock-arrows-drawing-fantasy-bow.png"],"route":"minor-plot"},{"characterClass":"Claw","description":"","type":"Melee","portrait":["https://i.pinimg.com/236x/c7/54/1b/c7541b65829d7526ba14b781651e199f--fantasy-weapons.jpg"],"route":"minor-plot"},{"characterClass":"Leather Armor","description":"","portrait":["https://i.mmo.cm/is/image/mmoimg/bigview/dragonrider-leather-armor-black--mw-302477-1.jpg"],"route":"minor-plot"},{"characterClass":"Chainmail","description":"","portrait":["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEmEAJP61dCHtO2_6QY11lQ-kxgWktoKGs3RF3c8x0UnipQDvqJg"],"route":"minor-plot"},{"characterClass":"Leather Helmet","description":"","portrait":["https://steel-mastery.com/image/catalog/products/FH-01/Leather_helmet_Sallet.jpg"],"route":"minor-plot"},{"characterClass":"Metal Helmet","description":"","portrait":["https://images-na.ssl-images-amazon.com/images/I/619sq4roa2L._SY355_.jpg"],"route":"minor-plot"},{"characterClass":"Leather Bracers","description":"","portrait":["https://i.etsystatic.com/7792648/r/il/71ca63/1491060687/il_794xN.1491060687_7dhp.jpg"],"route":"minor-plot"},{"characterClass":"Leather Greaves","description":"","portrait":["https://cdn3.eviltailors.com/20242-big_default_2x/quintus-upper-leather-greaves.jpg"],"route":"minor-plot"},{"characterClass":"Metal Bracers","description":"","portrait":["https://farm1.static.flickr.com/265/32180651910_9293d030a3_b.jpg"],"route":"minor-plot"},{"characterClass":"Metal Greaves","description":"","portrait":["https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Pair_of_Greaves_%28Lower_Leg_Defenses%29_MET_DP-13125-029.jpg/170px-Pair_of_Greaves_%28Lower_Leg_Defenses%29_MET_DP-13125-029.jpg"],"route":"minor-plot"}],"portents":[{"characterClass":"Curse","description":"<p>There are many different beings, including humans, that can curse someone. These curses take many different shapes. As opposed to what people believe, they do not affect the victim in combat but rather in their every day life, constantly and mercilessly.</p><p>Maybe the powerful merchant starts losing their gold and wares, then their home and family, until nothing is left of them except a beggar. Maybe the beautiful courtisan starts getting a rash in their face until nobody wants to lay with them in bed</p><p>Curses are an excellet tool for the Narrator to use and stir the plot when a player has not been taking their own decisions seriously at crucial points of the adventure/</p><b>It is up to the story itself on how a character will get cleared of the curse.</b>","portrait":["https://i.pinimg.com/originals/51/98/8b/51988b770c5de63c939e5207ee86d128.jpg"],"route":"minor-plot"},{"characterClass":"Blessing","description":"","portrait":["https://i.pinimg.com/originals/2c/44/6e/2c446e932f0e72f6a756884bef7e4059.jpg"],"route":"minor-plot"},{"characterClass":"Telekinesis","description":"","portrait":["https://i.warosu.org/data/tg/img/0367/88/1418702014220.jpg"],"route":"minor-plot"},{"characterClass":"Charm","description":"","portrait":["https://i.pinimg.com/originals/71/9a/6f/719a6fe9b115d4f042b80e92d993ba76.jpg"],"route":"minor-plot"},{"characterClass":"Light Fire","description":"","portrait":["http://th07.deviantart.net/fs70/PRE/i/2010/169/b/0/Fire_mage_by_Eliag1101.jpg"],"route":"minor-plot"},{"characterClass":"Terror","description":"","portrait":["https://i.pinimg.com/originals/70/c8/c3/70c8c3561a29fd28cbfa6baea8e40359.jpg"],"route":"minor-plot"},{"characterClass":"Illusion of Self","description":"","portrait":["https://i.pinimg.com/originals/59/df/2f/59df2f5c6b4d9d07dc973a25e390e87a.jpg"],"route":"minor-plot"},{"characterClass":"Awaken Elder God","description":"","portrait":["https://scontent-lga3-1.cdninstagram.com/vp/b11eeff68c6e49258ac53a80a16e2e6a/5D695B22/t51.2885-15/e15/c236.0.607.607a/56213865_2057872174341004_3989982013542902704_n.jpg?_nc_ht=scontent-lga3-1.cdninstagram.com"],"route":"minor-plot"},{"characterClass":"Attain Immortality","description":"","portrait":["http://www.epilogue.net/sites/default/files/imagecache/gallery_lg/images/02/41/13768_1034568000.jpg"],"route":"minor-plot"},{"characterClass":"Abomination","description":"","portrait":["https://i.pinimg.com/originals/ca/c3/2a/cac32a36514df1855e6b914f003cb023.jpg"],"route":"minor-plot"},{"characterClass":"Resurrect Dead","description":"","portrait":["http://coolvibe.com/wp-content/uploads/2012/10/Fantasy-Art-Jessada-Sutthi-Necromancer.jpg"],"route":"minor-plot"}],"pantheon":[{"characterClass":"Love, beauty - M","description":"","portrait":["https://i.etsystatic.com/8193558/r/il/1109ed/1495784226/il_794xN.1495784226_tg1z.jpg"],"route":"minor-plot"},{"characterClass":"Hatred, vengeance - F","description":"","portrait":["https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/73fd5feb-8a2e-46e3-8ab9-c764280fb325/d94v10j-7630529f-92fa-4db5-be45-4b1666e7072a.jpg?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzczZmQ1ZmViLThhMmUtNDZlMy04YWI5LWM3NjQyODBmYjMyNVwvZDk0djEwai03NjMwNTI5Zi05MmZhLTRkYjUtYmU0NS00YjE2NjZlNzA3MmEuanBnIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.u_TQnR9gtTPRZIkQ-QU990oPKp4Iyh5YzRCgPolzsJM"],"route":"minor-plot"},{"characterClass":"War - M","description":"","portrait":["https://i.pinimg.com/originals/71/57/34/7157349a5bb3c1fc88044cc46e6b5eb4.jpg"],"route":"minor-plot"},{"characterClass":"Death, underworld - F","description":"","portrait":["https://i.pinimg.com/originals/37/23/cb/3723cb89466e5d9355b9efecc536f587.jpg"],"route":"minor-plot"},{"characterClass":"Earth, health, harvest - F","description":"","portrait":["https://i.pinimg.com/736x/1d/91/12/1d9112439d17e25882ff8b2fb6ca61cd.jpg"],"route":"minor-plot"},{"characterClass":"Heaven, storm, hunting, rain - M","description":"","portrait":["http://www.stephaniegobby.com/wp-content/uploads/2018/06/Stephanie-Gobby-Odin.jpg"],"route":"minor-plot"},{"characterClass":"Wine, beer - F","description":"","portrait":["https://i.pinimg.com/236x/84/21/7f/84217f6991323296ef0f6adb7010350c--melanie-delon-fantasy-artwork.jpg"],"route":"minor-plot"},{"characterClass":"Fortune - M","description":"","portrait":["https://i.pinimg.com/736x/e0/5e/18/e05e18b18e85f4dca4ef5de4c07f0ad4.jpg"],"route":"minor-plot"},{"characterClass":"Void - M","description":"","portrait":["https://i.pinimg.com/originals/7f/8a/20/7f8a203b3af1255cd1455112b2b66b43.jpg"],"route":"minor-plot"},{"characterClass":"Deceit - M/F","description":"","portrait":["https://i.pinimg.com/originals/84/44/7c/84447cec5d7ba2cb4d755c379fb2df7b.jpg"],"route":"minor-plot"},{"characterClass":"Disease - F","description":"","portrait":["https://i.pinimg.com/originals/40/13/f3/4013f35449e74c751750db514f729950.jpg"],"route":"minor-plot"}],"locations":[{"characterClass":"Dungeon","description":"Dungeons are subterranean structures that were build with the purpose of locking up prisoners and torture. Because they are underground there are accesses to the exterior through small holes in the ceiling next to the wall, which at the same time it kept fresher air it also let in the rain and small animals like rats and other vermin.","portrait":["http://jdillustration.jimmsdesign.co.uk/images/full-scale-image/blossomtree-dungeon.jpg"],"route":"minor-plot"},{"characterClass":"Castle","description":"","portrait":["https://i.pinimg.com/236x/c5/86/9f/c5869f05d3498bf056fa3cf3dddf5bff--environment-concept-environment-design.jpg"],"route":"minor-plot"},{"characterClass":"House","description":"","portrait":["https://i.pinimg.com/originals/7f/bd/92/7fbd9281cad9f97d35c0e8fc15b91655.jpg"],"route":"minor-plot"},{"characterClass":"Temple","description":"","portrait":["http://41.media.tumblr.com/d6469e24bdc3109374dfd0401275633e/tumblr_nm1tngTBkq1tv3g49o1_500.jpg"],"route":"minor-plot"},{"characterClass":"Maze","description":"","portrait":["https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/1ef81753-8934-493b-8e9a-6323a4632eb6/d85ahb3-ae97f1fd-1f55-4d71-baca-3b7b05b4525d.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzFlZjgxNzUzLTg5MzQtNDkzYi04ZTlhLTYzMjNhNDYzMmViNlwvZDg1YWhiMy1hZTk3ZjFmZC0xZjU1LTRkNzEtYmFjYS0zYjdiMDViNDUyNWQucG5nIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.57XMfpA0lGWnfVyMGkLdO57xVuR24YXXyKkWrsbzbx8"],"route":"minor-plot"},{"characterClass":"Cave","description":"","portrait":["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRk8HtDTQSKIxr3gNAWcuMPJoPHC6LCjh1ii_GQb7Wy8jh1R4p42Q"],"route":"minor-plot"},{"characterClass":"Sewers","description":"","portrait":["https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/58d19be9-76f8-4690-9948-6f0ba24ac53f/d2oa3as-e9acb81e-87b5-4de6-ba29-5ba70fbea89a.jpg?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzU4ZDE5YmU5LTc2ZjgtNDY5MC05OTQ4LTZmMGJhMjRhYzUzZlwvZDJvYTNhcy1lOWFjYjgxZS04N2I1LTRkZTYtYmEyOS01YmE3MGZiZWE4OWEuanBnIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.7n_aBbEDRm89Ou2qe0aciWqI74I_MwsGeZI9uAqgy3k"],"route":"minor-plot"},{"characterClass":"Market","description":"","portrait":["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQiFYo6UYeJhvXw-k-7Ple2S5isjPY213cPWCc5k_0CXbo0XJK3Eg"],"route":"minor-plot"},{"characterClass":"Shrine","description":"A shrine is basically a really small temple. It serves the same religious purpose but doesn't have the facilities to accomodate more than one person","portrait":["https://images.megapixl.com/1239/12392657.jpg"],"route":"minor-plot"},{"characterClass":"Graveyard","description":"","portrait":["https://i.pinimg.com/originals/54/42/cd/5442cd07eb8f767bca7f269607187596.jpg"],"route":"minor-plot"}]},"scenery":[{"type":"scenery","name":"Vines","scenery":true,"description":"","portrait":"https://img1.ak.crunchyroll.com/i/spire3/dbf767346cbb8511013c55dace1025491321331274_full.jpg","saveStat":0,"saveDiff":12,"damage":[0,12]},{"type":"scenery","name":"Lava","scenery":true,"description":"","portrait":"https://vignette.wikia.nocookie.net/finalfantasy/images/6/66/FFIIIDS_Lava_Damage_Floor.png/revision/latest/zoom-crop/width/240/height/240?cb=20101221050526","saveStat":2,"saveDiff":12,"damage":[0,12]},{"type":"scenery","name":"Swinging Pendulum","scenery":true,"description":"","portrait":"https://static.tvtropes.org/pmwiki/pub/images/pANDp_5940.jpg","saveStat":1,"saveDiff":12,"damage":[0,36]},{"type":"scenery","name":"10ft Fall","scenery":true,"description":"","portrait":"https://i.pinimg.com/originals/c0/71/71/c07171035a4309af89c1f57308eca977.jpg","saveStat":1,"saveDiff":12,"damage":[0,6]},{"type":"scenery","name":"25ft Fall","scenery":true,"description":"","portrait":"https://i.pinimg.com/originals/c0/71/71/c07171035a4309af89c1f57308eca977.jpg","saveStat":1,"saveDiff":12,"damage":[7,16]},{"type":"scenery","name":"50ft Fall","scenery":true,"description":"","portrait":"https://i.pinimg.com/originals/c0/71/71/c07171035a4309af89c1f57308eca977.jpg","saveStat":1,"saveDiff":12,"damage":[20,45]},{"type":"scenery","name":"Spiked Pit","scenery":true,"description":"","portrait":"https://cdnb.artstation.com/p/assets/images/images/010/376/701/large/joel-lopez-spiked-pit-copy.jpg?1524088001","saveStat":1,"saveDiff":12,"damage":[0,10]},{"type":"scenery","name":"Poison Gas Cloud","scenery":true,"description":"","portrait":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQj5jjgFnvMBW8y62qp4nnPmP_VhMDdjPSyF6EdE-3oPbvJl-ME","saveStat":2,"saveDiff":12,"damage":[6,12]},{"type":"scenery","name":"Arrow Trap","scenery":true,"description":"","portrait":"https://cdnb.artstation.com/p/assets/images/images/001/950/929/large/dimas-wijil-pamungkas-arrow-barrage-by-happysadcorner-d9gddnq.jpg?1455046628","saveStat":1,"saveDiff":12,"damage":[0,12]},{"type":"scenery","name":"Crushing Trap","scenery":true,"description":"","portrait":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTKLcPsfZiDsj4o5SdZvk1Rwj9r7zG_Q2Z-_JobOobhDx__BYZh","saveStat":1,"saveDiff":12,"damage":[0,200]},{"type":"scenery","name":"Rolling Boulder","scenery":true,"description":"","portrait":"https://cf.geekdo-images.com/camo/f8829192ef94ed1ea8e1c3e720a738f0514b5182/687474703a2f2f637269746963616c2d686974732e636f6d2f77702d636f6e74656e742f75706c6f6164732f323031312f30342f646e645f74726170732e6a7067","saveStat":3,"saveDiff":12,"damage":[0,200]},{"type":"scenery","name":"Drowning","scenery":true,"description":"","portrait":"https://i.pinimg.com/originals/c0/fd/bf/c0fdbf5839187f979f4862687a5824d7.png","saveStat":3,"saveDiff":10,"damage":[0,10]},{"type":"scenery","name":"Spider Web","scenery":true,"description":"","portrait":"https://cache.desktopnexus.com/thumbseg/451/451906-bigthumbnail.jpg","saveStat":0,"saveDiff":12,"damage":[0,0]},{"type":"scenery","name":"Fire","scenery":true,"description":"","portrait":"https://staticdelivery.nexusmods.com/mods/1704/images/thumbnails/78709-0-1473783976.png","saveStat":1,"saveDiff":12,"damage":[6,12]},{"type":"scenery","name":"Blades Trap","scenery":true,"description":"","portrait":"https://gamepedia.cursecdn.com/zelda_gamepedia_en/9/99/Blade_Trap.png","saveStat":1,"saveDiff":12,"damage":[0,30]},{"type":"scenery","name":"Acid Trap","scenery":true,"description":"","portrait":"https://s3.amazonaws.com/files.d20.io/marketplace/44825/56-uB4LDN9_sR2_RKYxkUQ/max.png?1410877712","saveStat":2,"saveDiff":12,"damage":[0,12]},{"type":"scenery","name":"Spiked Concoction","scenery":true,"description":"","portrait":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQe0g2irTVPQLovPabAzub-iwWc71zk9AILDYWPGECTVAUhsndQ8Q","saveStat":1,"saveDiff":12,"damage":[0,40]},{"type":"scenery","name":"Falling Rocks","scenery":true,"description":"","portrait":"https://i.ytimg.com/vi/ahvpyv_cPFI/maxresdefault.jpg","saveStat":1,"saveDiff":12,"damage":[6,20]},{"type":"scenery","name":"Falling Tree","scenery":true,"description":"","portrait":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTqu6I9C3cSUhbk4SMEc6FWd0R087Jq3oLtwe2iwCfghyqXaqvE","saveStat":1,"saveDiff":12,"damage":[0,15]},{"type":"scenery","name":"Frost Wind","scenery":true,"description":"","portrait":"https://gamepedia.cursecdn.com/scrolls_gamepedia/a/a0/Frost_Wind_%28art%29.png?version=33f81af7410c82df6da3ec90546a30bf","saveStat":2,"saveDiff":12,"damage":[10,15]}],"npcs":[{"name":"","type":"creature","gender":"","territory":["town"],"characterClass":"ShopKeeper","index":null,"description":"<p>Shopkeepers are spread around the world and are as varied in the way they look as they are on behaviour. Their wares come from...</p><p>The prices tend to go up and down</p>","portrait":{"male":"https://i.pinimg.com/originals/01/3f/50/013f50b4f872aa094b76659120594f60.jpg","female":"https://cdnb.artstation.com/p/assets/covers/images/009/943/009/20180322002043/smaller_square/julia-yurtsev-shopkeeper-02.jpg?1521696043"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Gladius","type":"Melee","mp":0,"range":5,"damage":[4,8,10]},{"name":"Dagger","type":"Melee","mp":0,"range":35,"damage":[3,6,10]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["town"],"characterClass":"Blacksmith","index":null,"description":"","portrait":{"male":"https://f4.bcbits.com/img/a3074138221_10.jpg","female":"https://i.pinimg.com/originals/b1/5f/1f/b15f1f42feac85d9ae1e80c083c54a27.jpg"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Longsword","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Composite Bow","type":"Ranged","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["town"],"characterClass":"InnKeeper","index":null,"description":"","portrait":{"male":"https://i.pinimg.com/originals/2b/ff/6d/2bff6daf654db10df00ee401c47e4801.jpg","female":"https://vignette.wikia.nocookie.net/witcher/images/1/15/Tw3_elsa.png/revision/latest?cb=20180106172046"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Gladius","type":"Melee","mp":0,"range":5,"damage":[4,8,10]},{"name":"Dagger","type":"Melee","mp":0,"range":35,"damage":[3,6,10]},{"name":"Brawl","type":"Melee","mp":0,"range":35,"damage":[1,2,4]},{"name":"Bow","type":"Ranged","mp":0,"range":35,"damage":[3,6,8]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["town"],"characterClass":"Inn Servant","index":null,"description":"","portrait":{"female":"https://i.pinimg.com/originals/4a/19/a9/4a19a912454c8ea1d96e7a3649cb5e33.jpg","male":"https://i.pinimg.com/originals/4d/0e/0b/4d0e0b8ff0d907c95a94295854187023.jpg"},"alias":"the Squeaky","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Dagger","type":"Melee","mp":0,"range":35,"damage":[3,6,10]},{"name":"Brawl","type":"Melee","mp":0,"range":35,"damage":[1,2,4]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["town","court"],"characterClass":"Prostitute","index":null,"description":"","portrait":{"female":"https://i.pinimg.com/originals/18/10/e0/1810e0bdf0d44ed37e74adfb623db657.png","male":"https://i.pinimg.com/originals/52/89/29/528929299074f20e2bb3696df6208056.jpg"},"alias":"","age":26,"stats":{"str":8,"dex":13,"con":12,"sta":12,"app":16,"pow":14},"martialProwess":0,"damageBonus":0,"defenseValue":8,"hitpoints":60,"tempHitpoints":60,"tempSanity":20,"sanity":20,"charisma":15,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Poison Dagger","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","desert","jungle","town","dimension","court"],"characterClass":"Guard","index":null,"description":"","portrait":{"male":"https://vignette.wikia.nocookie.net/moon-guard/images/d/d3/A7c7259ef6050e967a93aa799d2d685d--fantasy-male-digital-portrait.jpg/revision/latest?cb=20171224092829","female":"https://i.pinimg.com/originals/44/4b/bf/444bbf7c6d002c1c3082fb218d00f4a1.jpg"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":30,"sanity":30,"charisma":10,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Long Sword","type":"Melee","mp":2,"range":5,"damage":[4,8,12]},{"name":"Spear","type":"Melee","mp":2,"range":10,"damage":[4,8,12]},{"name":"Brawl","type":"Melee","mp":0,"range":35,"damage":[1,2,4]},{"name":"Bow","type":"Ranged","mp":0,"range":35,"damage":[3,6,8]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","desert","steppes","jungle","town","dimension","court"],"characterClass":"Villain","index":null,"description":"","portrait":{"male":"https://i.redd.it/r0q7hntf8ya11.jpg","female":"https://i.pinimg.com/originals/68/5f/7f/685f7f1a5c3f8290948ab4d3da900b3e.jpg"},"alias":"","age":26,"stats":{"str":9,"dex":12,"con":12,"sta":10,"app":13,"pow":15},"martialProwess":2,"damageBonus":0,"defenseValue":10,"hitpoints":50,"tempHitpoints":70,"tempSanity":30,"sanity":30,"charisma":14,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Gladius","type":"Melee","mp":0,"range":5,"damage":[4,8,10]},{"name":"Dagger","type":"Melee","mp":0,"range":35,"damage":[3,6,10]},{"name":"Bow","type":"Ranged","mp":0,"range":35,"damage":[3,6,8]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","desert","sea","frozen","steppes","jungle","town","dimension","court"],"characterClass":"Thief","index":null,"description":"","portrait":{"male":"https://i.pinimg.com/originals/5c/3a/ce/5c3aceff2142026f41dcace98fa51b0a.jpg","female":"https://i.pinimg.com/236x/84/93/65/849365a01ced0d131c37112d4021f66f--character-concept-art-character-portraits.jpg"},"alias":"","age":36,"stats":{"str":14,"dex":18,"con":15,"sta":15,"app":8,"pow":12},"martialProwess":4,"damageBonus":3,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":40,"sanity":40,"charisma":10,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Gladius","type":"Melee","mp":0,"range":5,"damage":[4,8,10]},{"name":"Dagger","type":"Melee","mp":0,"range":35,"damage":[3,6,10]},{"name":"Brawl","type":"Melee","mp":0,"range":35,"damage":[1,2,4]},{"name":"Bow","type":"Ranged","mp":0,"range":35,"damage":[3,6,8]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["town","court"],"characterClass":"Noble","index":null,"description":"","portrait":{"male":"https://i.pinimg.com/originals/83/de/d5/83ded529d8d6c94539c30ea61e46bd19.jpg","female":"https://i.warosu.org/data/tg/img/0287/82/1386713571361.jpg"},"alias":"","age":26,"stats":{"str":12,"dex":12,"con":14,"sta":10,"app":16,"pow":14},"martialProwess":2,"damageBonus":2,"defenseValue":12,"hitpoints":70,"tempHitpoints":70,"tempSanity":40,"sanity":40,"charisma":15,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Long Sword","type":"Melee","mp":0,"range":5,"damage":[4,8,10]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","desert","sea","steppes","jungle","town","dimension","court"],"characterClass":"Commoner","index":null,"description":"","portrait":{"male":"https://i.pinimg.com/originals/45/ef/37/45ef37cfe0bcf67a0bd607dc72a47a99.jpg","female":"https://i.pinimg.com/originals/23/22/22/2322220457d9a9106801ad38e8d5d2a7.jpg"},"alias":"","age":26,"stats":{"str":10,"dex":10,"con":10,"sta":10,"app":8,"pow":8},"martialProwess":0,"damageBonus":0,"defenseValue":15,"hitpoints":50,"tempHitpoints":70,"tempSanity":20,"sanity":20,"charisma":8,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Dagger","type":"Melee","mp":0,"range":35,"damage":[3,6,10]},{"name":"Brawl","type":"Melee","mp":0,"range":35,"damage":[1,2,4]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","frozen","jungle","dimension"],"characterClass":"Tribe Leader","index":null,"description":"","portrait":{"male":"https://i.pinimg.com/originals/6b/61/87/6b618706f6a9a9dfea1d34fd4f616c96.jpg","female":"https://i.pinimg.com/736x/f9/5c/f0/f95cf06b606f5e9af3b1b01dd20fb98e.jpg"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Battle Axe","type":"Melee","mp":0,"range":5,"damage":[5,9,14]},{"name":"Dagger","type":"Melee","mp":0,"range":35,"damage":[3,6,10]},{"name":"Brawl","type":"Melee","mp":0,"range":35,"damage":[1,2,4]},{"name":"Composite Bow","type":"Ranged","mp":0,"range":35,"damage":[3,6,8]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","frozen","jungle","dimension"],"characterClass":"Clansman","index":null,"description":"","portrait":{"male":"https://i.pinimg.com/originals/7a/6e/5b/7a6e5b27f0835ca5aed6cf9b48dfa6e4.jpg","female":"https://i.pinimg.com/736x/2a/34/0b/2a340b056bf8ca3b958360b23b0c7c80.jpg"},"alias":"","age":32,"stats":{"str":16,"dex":14,"con":12,"sta":10,"app":8,"pow":10},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":20,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Uftberht","type":"Melee","mp":0,"range":5,"damage":[4,8,10]},{"name":"Dagger","type":"Melee","mp":0,"range":35,"damage":[3,6,10]},{"name":"Brawl","type":"Melee","mp":0,"range":35,"damage":[1,2,4]},{"name":"Bow","type":"Ranged","mp":0,"range":35,"damage":[3,6,8]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["town","court"],"characterClass":"Monarch","index":null,"description":"","portrait":{"male":"https://i.pinimg.com/originals/47/e4/b1/47e4b16630a9c97946cbfdc8180dcc7c.jpg","female":"https://vignette.wikia.nocookie.net/worlds-divided/images/5/5d/46322_1371463565.jpg/revision/latest?cb=20140913002518"},"alias":"","age":26,"stats":{"str":12,"dex":12,"con":14,"sta":10,"app":14,"pow":15},"martialProwess":3,"damageBonus":2,"defenseValue":13,"hitpoints":70,"tempHitpoints":70,"tempSanity":30,"sanity":30,"charisma":15,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Gladius","type":"Melee","mp":0,"range":5,"damage":[4,8,10]},{"name":"Dagger","type":"Melee","mp":0,"range":35,"damage":[3,6,10]},{"name":"Brawl","type":"Melee","mp":0,"range":35,"damage":[1,2,4]},{"name":"Bow","type":"Ranged","mp":0,"range":35,"damage":[3,6,8]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","sea","frozen","desert","jungle","town","dimension","court"],"characterClass":"Priest","index":null,"description":"","portrait":{"male":"https://vignette.wikia.nocookie.net/damo/images/a/a6/F46368bbf952cf70a28ed091161f4f6f--fantasy-rpg-fantasy-priest.jpg/revision/latest?cb=20170921195417","female":"https://cdnb.artstation.com/p/assets/images/images/003/466/035/large/andy-lamarca-final-small.jpg?1473971995"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"}],"pPerception":11,"weapons":[{"name":"Mace","type":"Melee","mp":0,"range":5,"damage":[4,8,10]},{"name":"Dagger","type":"Melee","mp":0,"range":35,"damage":[3,6,10]},{"name":"Brawl","type":"Melee","mp":0,"range":35,"damage":[1,2,4]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","sea","desert","frozen","jungle","town","dimension","court"],"characterClass":"Sorcerer","index":null,"description":"","portrait":{"male":"https://cdna.artstation.com/p/assets/images/images/010/803/308/large/bernardo-hasselmann-eldrinportrait.jpg?1526320680","female":"https://cdnb.artstation.com/p/assets/images/images/005/284/743/large/istvan-straban-sorceress-net-istvan-straban.jpg?1489929190"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Staff","type":"Melee","mp":0,"range":5,"damage":[4,8,10]},{"name":"Dagger","type":"Melee","mp":0,"range":35,"damage":[3,6,10]},{"name":"Brawl","type":"Melee","mp":0,"range":35,"damage":[1,2,4]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["town"],"characterClass":"Beggar","index":null,"description":"","portrait":{"male":"http://3.bp.blogspot.com/-wTnXKzaaCjA/Ta5K_JJinCI/AAAAAAAAAME/IWoh_zDSLv0/s1600/oldman.jpg","female":"https://i.pinimg.com/originals/f4/8f/f2/f48ff2780416bb3ca26244376c332576.jpg"},"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Brawl","type":"Melee","mp":0,"range":35,"damage":[1,2,4]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","sea","frozen","steppes","jungle","dimension"],"characterClass":"Witch","index":null,"description":"","portrait":{"female":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS4ye3uM1nCic-loIAVHtYgnK_Xzt5uDx_zH_Wy0owIYJoRElQl","male":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS4ye3uM1nCic-loIAVHtYgnK_Xzt5uDx_zH_Wy0owIYJoRElQl"},"alias":"","age":86,"stats":{"str":6,"dex":8,"con":12,"sta":10,"app":8,"pow":18},"martialProwess":0,"damageBonus":-2,"defenseValue":15,"hitpoints":50,"tempHitpoints":50,"tempSanity":10,"sanity":80,"charisma":13,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Staff","type":"Melee","mp":0,"range":5,"damage":[4,8,10]},{"name":"Dagger","type":"Melee","mp":0,"range":35,"damage":[3,6,10]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]}],"creatures":[{"name":"","type":"creature","description":"","portrait":{"female":"https://josephvargo.com/images/09_Sword-and-Sorcery/Caveman.jpg","male":"https://josephvargo.com/images/09_Sword-and-Sorcery/Caveman.jpg"},"gender":"","territory":["dungeon","mountains","steppes","frozen","jungle"],"characterClass":"Dek","index":null,"alias":"","age":16,"stats":{"str":10,"dex":13,"con":10,"sta":35,"app":4,"pow":8},"martialProwess":2,"damageBonus":2,"defenseValue":7,"hitpoints":25,"tempHitpoints":25,"tempSanity":15,"sanity":15,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Stone Axe","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Atlatl","type":"Ranged","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"<p>A Dragon is, basically speaking, a very large reptilian that for some reason has managed to grow to disproportionate size. They are instinctive, savage, incredibly strong and fast. Not many people live to tell the story when they encounter a Dragon, as they reach speeds of 100ft per second and capable of jumping to up to 40ft.</p><p>According to folklore Dragons are capable of flight and breathe fire, which isn't true. Not that this makes them less lethal. They use their tonge to taste the air for prey and locate their target from even the most obscure hidden places. The question is not if the Dragon will find you, but more why is it taking so long to kill you.</p><p>They are cold blooded, so they prefer basking in the sun rather than living in the dark. They inhabit caves but their only predators are giant rocs, and only in their infancy</p><p>A Dragon's reproductive cycle lasts a few years and their eggs are quite valuable if brought in intact</p><p>They are incapable of speech and can't be domesticated, although some tribes have submitted sacrifices to them in order to appease them, they will eat anything within their reach before they retire to digest their prey</p><p>Although it is not unknown for an individual to claim to have killed a Dragon, the only stories that can be believed come from people who are either terribly mangled (them being the lucky ones in their group) or people who have used their wits and their environment to their advantage, as a direct confrontation with a Dragon most certainly spells death.</p><p>Luckily for everybody Dragons live in isolated areas, as most life prefers to stir away from their turf. As such they are very territorial and precious of their scarce prey, so unless for it is for reproduction, Dragons are quite good at killing each other, and they never let the corpses of their kin to go to waste.</p><p>Their habitat is quite varied, and you can find them pretty much anywhere except in the frozen areas, it being too cold for them.</p><p>Dragons tend to live in places littered with weapons, armor, skeletons and more than a few coins. They don't have use for these things, yet they naturally end there from the hundreds of adventurers whose stupidity led them to try their luck at hunting these giant lizards.","portrait":{"female":"https://img00.deviantart.net/5fb1/i/2010/014/4/b/lizard_by_akiman.jpg","male":"https://img00.deviantart.net/5fb1/i/2010/014/4/b/lizard_by_akiman.jpg"},"name":"","type":"creature","gender":"","territory":["forest","mountains","jungle","sea","steppes","town","dimension"],"characterClass":"Dragon","index":null,"alias":"","age":26,"stats":{"str":60,"dex":40,"con":70,"sta":30,"app":12,"pow":13},"martialProwess":7,"damageBonus":20,"defenseValue":22,"hitpoints":350,"tempHitpoints":350,"tempSanity":40,"sanity":40,"charisma":12,"actions":[{"name":"Attack"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/64/30/a7/6430a71efea4d8f3939035239a6105a1.jpg","male":"https://i.pinimg.com/originals/64/30/a7/6430a71efea4d8f3939035239a6105a1.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","mountains","steppes","town","dimension"],"characterClass":"Winged Horror","index":null,"alias":"","age":128,"stats":{"str":20,"dex":18,"con":18,"sta":25,"app":4,"pow":14},"martialProwess":12,"damageBonus":8,"defenseValue":15,"hitpoints":90,"tempHitpoints":90,"tempSanity":50,"sanity":50,"charisma":6,"actions":[{"name":"Attack"},{"name":"Intimidate"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":5,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":["Winged horror wings, Winged horror Brain, Winged horror heart, Winged horror claws"],"items":"Medallion"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/f3/2a/6a/f32a6a6d450f38908b341cac2f3a14bf.jpg","male":"https://i.pinimg.com/originals/f3/2a/6a/f32a6a6d450f38908b341cac2f3a14bf.jpg"},"name":"","type":"creature","gender":"","territory":["forest","mountains","frozen","steppes"],"characterClass":"Dire Wolf","index":null,"alias":"","age":26,"stats":{"str":18,"dex":15,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":7,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Intimidate"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"http://www.imarvintpa.com/Mapping/Monster%20Portraits/Yuan-Ti%203.png","male":"http://www.imarvintpa.com/Mapping/Monster%20Portraits/Yuan-Ti%203.png"},"name":"","type":"creature","gender":"","territory":["dungeon","jungle","desert","dimension"],"characterClass":"Snake Man","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"http://fc05.deviantart.net/fs42/i/2009/156/6/f/KumpeeSigha__Croc_Lion__Male_by_Gandharvasstudio.jpg","male":"http://fc05.deviantart.net/fs42/i/2009/156/6/f/KumpeeSigha__Croc_Lion__Male_by_Gandharvasstudio.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","jungle"],"characterClass":"Crocodile","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"http://www.howarddavidjohnson.com/Fafnir_the_Frost_Giant_.jpg","male":"http://www.howarddavidjohnson.com/Fafnir_the_Frost_Giant_.jpg"},"name":"","type":"creature","gender":"","territory":["forest","mountains","frozen","steppes"],"characterClass":"Giant","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://dialecticanalyticalman.files.wordpress.com/2016/11/cyclops-2.jpg","male":"https://dialecticanalyticalman.files.wordpress.com/2016/11/cyclops-2.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","jungle","sea","dimension"],"characterClass":"Cyclops","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/00/a7/43/00a7432349887250c592fc8b35068b5a.jpg","male":"https://i.pinimg.com/originals/00/a7/43/00a7432349887250c592fc8b35068b5a.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","jungle"],"characterClass":"Giant Toad","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.ebayimg.com/images/g/y8oAAOSwvgdW2y-T/s-l300.jpg","male":"https://i.ebayimg.com/images/g/y8oAAOSwvgdW2y-T/s-l300.jpg"},"name":"","type":"creature","gender":"","territory":["jungle"],"characterClass":"Panther","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/26/c4/55/26c4559b1fdfcd753ac739aec6195045.jpg","male":"https://i.pinimg.com/originals/26/c4/55/26c4559b1fdfcd753ac739aec6195045.jpg"},"name":"","type":"creature","gender":"","territory":["jungle"],"characterClass":"Tiger","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"http://www.epilogue.net/sites/default/files/imagecache/gallery_lg/images/08/33/41075_1218513600.jpg","male":"http://www.epilogue.net/sites/default/files/imagecache/gallery_lg/images/08/33/41075_1218513600.jpg"},"name":"","type":"creature","gender":"","territory":["mountains","frozen","steppes"],"characterClass":"Mammoth","index":null,"alias":"","age":26,"stats":{"str":48,"dex":14,"con":34,"sta":10,"app":10,"pow":12},"martialProwess":2,"damageBonus":12,"defenseValue":15,"hitpoints":180,"tempHitpoints":180,"tempSanity":20,"sanity":20,"charisma":11,"actions":[{"name":"Attack"},{"name":"Intimidate"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://img00.deviantart.net/c5ad/i/2014/321/6/5/sabretooth_pounce_by_concept_art_house-d1if245.jpg","male":"https://img00.deviantart.net/c5ad/i/2014/321/6/5/sabretooth_pounce_by_concept_art_house-d1if245.jpg"},"name":"","type":"creature","gender":"","territory":["mountains","steppes","frozen","jungle"],"characterClass":"Sabretooth","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://cdn130.picsart.com/239044225047202.jpg?r1024x1024","male":"https://cdn130.picsart.com/239044225047202.jpg?r1024x1024"},"name":"","type":"creature","gender":"","territory":["steppes","jungle","desert"],"characterClass":"Lion","index":null,"alias":"","age":26,"stats":{"str":20,"dex":18,"con":14,"sta":10,"app":14,"pow":13},"martialProwess":7,"damageBonus":7,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":30,"sanity":30,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://pre00.deviantart.net/129f/th/pre/i/2012/250/8/1/war_elephant_by_sugarsart-d5dw7v4.jpg","male":"https://pre00.deviantart.net/129f/th/pre/i/2012/250/8/1/war_elephant_by_sugarsart-d5dw7v4.jpg"},"name":"","type":"creature","gender":"","territory":["steppes","desert","jungle"],"characterClass":"Elephant","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/2c/33/72/2c33724d16c65c746104c08f53e9cc51.jpg","male":"https://i.pinimg.com/originals/2c/33/72/2c33724d16c65c746104c08f53e9cc51.jpg"},"name":"","type":"creature","gender":"","territory":["forest","jungle"],"characterClass":"Boar","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://vignette.wikia.nocookie.net/bloodrealm/images/2/2f/CarnivorousPlant.png/revision/latest?cb=20140320205231","male":"https://vignette.wikia.nocookie.net/bloodrealm/images/2/2f/CarnivorousPlant.png/revision/latest?cb=20140320205231"},"name":"","type":"creature","gender":"","territory":["forest","jungle","dimension"],"characterClass":"Flesh eating Plant","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"http://www.bergsma.com/images/T/522.jpg","male":"http://www.bergsma.com/images/T/522.jpg"},"name":"","type":"creature","gender":"","territory":["mountains","steppes"],"characterClass":"Mountain Lion","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/9b/df/3c/9bdf3cdc5cb16cce57a8ccae1b4cd385.jpg","male":"https://i.pinimg.com/originals/9b/df/3c/9bdf3cdc5cb16cce57a8ccae1b4cd385.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","desert","jungle","dimension"],"characterClass":"Giant Snake","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/ce/86/ac/ce86ac15466c16875efbbf7df87bbe8b.jpg","male":"https://i.pinimg.com/originals/ce/86/ac/ce86ac15466c16875efbbf7df87bbe8b.jpg"},"name":"","type":"creature","gender":"","territory":["forest","mountains","frozen","steppes"],"characterClass":"Wolf","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://vignette.wikia.nocookie.net/dragonfantasysaga/images/f/f4/Inimigo_-_Imperial_Necromancer.jpg/revision/latest?cb=20130802203741","male":"https://vignette.wikia.nocookie.net/dragonfantasysaga/images/f/f4/Inimigo_-_Imperial_Necromancer.jpg/revision/latest?cb=20130802203741"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","desert","jungle","town","dimension"],"characterClass":"Necromancer","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Dagger","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Staff","type":"Melee","mp":0,"range":5,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://static1.squarespace.com/static/51b3dc8ee4b051b96ceb10de/t/5429785ee4b047c33e155a12/1412003936853/medieval-skeleton-warrior-art-by-markus-neidel","male":"https://static1.squarespace.com/static/51b3dc8ee4b051b96ceb10de/t/5429785ee4b047c33e155a12/1412003936853/medieval-skeleton-warrior-art-by-markus-neidel"},"name":"","type":"creature","gender":"","territory":["dungeon","steppes","frozen","jungle","sea","dimension"],"characterClass":"Skeleton Warrior","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/e4/84/e9/e484e9b8a5e9c988f829639a6449ce76.jpg","male":"https://i.pinimg.com/originals/e4/84/e9/e484e9b8a5e9c988f829639a6449ce76.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","frozen","steppes","sea","desert","jungle","town","dimension"],"characterClass":"Zombie","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/2b/a2/72/2ba272fbe6a7145c3410113bff0e4e3b.jpg","male":"https://i.pinimg.com/originals/2b/a2/72/2ba272fbe6a7145c3410113bff0e4e3b.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","town","mountains","dimension","court"],"characterClass":"Vampire","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"http://s1.1zoom.me/big0/725/Ghost_Night_Street_510992.jpg","male":"http://s1.1zoom.me/big0/725/Ghost_Night_Street_510992.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","frozen","steppes","sea","desert","jungle","town","dimension","court"],"characterClass":"Ghost","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://pm1.narvii.com/6622/fc5efc93792b6c2f7b3abd6e9c21814c3f2c7684_hq.jpg","male":"https://pm1.narvii.com/6622/fc5efc93792b6c2f7b3abd6e9c21814c3f2c7684_hq.jpg"},"name":"","type":"creature","gender":"","territory":["forest","mountains","frozen","steppes","desert","jungle"],"characterClass":"Skinwalker","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/8d/24/01/8d240171d77ef310f903b85f154e470a.jpg","male":"https://i.pinimg.com/originals/8d/24/01/8d240171d77ef310f903b85f154e470a.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","frozen","steppes","town","court"],"characterClass":"Werewolf","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://www.artranked.com/images/8b/8baf5e7da3162f26a6b977478d5c83a2.jpg","male":"https://www.artranked.com/images/8b/8baf5e7da3162f26a6b977478d5c83a2.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","mountains","desert","jungle","dimension"],"characterClass":"Mummy","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/a2/eb/af/a2ebafbd8202b2fb4578a19612a31335.jpg","male":"https://i.pinimg.com/originals/a2/eb/af/a2ebafbd8202b2fb4578a19612a31335.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","frozen","sea","desert","jungle","town","dimension","court"],"characterClass":"Cult Leader","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://www.frontlinegaming.org/wp-content/uploads/2016/01/chaos_cultist_by_slipgatecentral.jpg","male":"https://www.frontlinegaming.org/wp-content/uploads/2016/01/chaos_cultist_by_slipgatecentral.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","frozen","sea","desert","jungle","town","dimension","court"],"characterClass":"Cultist","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://s-media-cache-ak0.pinimg.com/736x/a2/85/ab/a285ab86539f573f657384209fc40420--bear-illustration-fantasy-illustration.jpg","male":"https://s-media-cache-ak0.pinimg.com/736x/a2/85/ab/a285ab86539f573f657384209fc40420--bear-illustration-fantasy-illustration.jpg"},"name":"","type":"creature","gender":"","territory":["forest","mountains","frozen","steppes"],"characterClass":"Bear","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://cdna.artstation.com/p/assets/images/images/010/147/732/large/alejandro-olmedo-terodactyl-hd-logo.jpg?1522830112","male":"https://cdna.artstation.com/p/assets/images/images/010/147/732/large/alejandro-olmedo-terodactyl-hd-logo.jpg?1522830112"},"name":"","type":"creature","gender":"","territory":["mountains","steppes","jungle","dimension"],"characterClass":"Pterodactyl","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/08/c3/6c/08c36c52617284113f30fd247f756b2b.jpg","male":"https://i.pinimg.com/originals/08/c3/6c/08c36c52617284113f30fd247f756b2b.jpg"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","desert","jungle","dimension"],"characterClass":"Giant Spider","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://horror.ambient-mixer.com/images_template/9/d/6/9d69187695b6bf111a13245dd0b81926_full.jpg","male":"https://horror.ambient-mixer.com/images_template/9/d/6/9d69187695b6bf111a13245dd0b81926_full.jpg"},"name":"","type":"creature","gender":"","territory":["mountains","steppes","desert","dimension"],"characterClass":"Locusts Swarm","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"male":"https://i.pinimg.com/474x/87/4f/9d/874f9d091bcc956277fdf0b1eb8b4c91--fantasy-monster-cthulhu-mythos.jpg","female":"https://i.pinimg.com/originals/e5/3f/6f/e53f6fa552f4a026c95c47605e37c2ba.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","jungle","sea","town","dimension"],"characterClass":"Deep One","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Claw","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Trident","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/93/f6/f7/93f6f75ebb63306d9577baa187ae15cb.jpg","male":"https://i.pinimg.com/originals/93/f6/f7/93f6f75ebb63306d9577baa187ae15cb.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","mountains","frozen","jungle","town","dimension"],"characterClass":"Formless horror","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://vignette.wikia.nocookie.net/the-legendary-moonlight-sculptor/images/d/df/Shadow.jpg/revision/latest?cb=20150921110101","male":"https://vignette.wikia.nocookie.net/the-legendary-moonlight-sculptor/images/d/df/Shadow.jpg/revision/latest?cb=20150921110101"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","frozen","mountains","steppes","desert","jungle","frozen","town","dimension","court"],"characterClass":"Shadow Creeper","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://c.wallhere.com/photos/3f/1d/artwork_fantasy_art_dead_demon_redhead-68416.jpg!d","male":"https://ksr-ugc.imgix.net/assets/011/526/715/6154c9ffe5d9ad083d057e4cae1f9a94_original.jpg?ixlib=rb-2.0.0&crop=faces&w=1552&h=873&fit=crop&v=1463684011&auto=format&frame=1&q=92&s=06b9de34eb39c0eb1b833d16c700d421"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","frozen","steppes","sea","desert","jungle","frozen","town","dimension","court"],"characterClass":"Demon","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/a6/7d/3d/a67d3d8f945844818fd751ea735095fe.jpg","male":"https://i.pinimg.com/originals/a6/7d/3d/a67d3d8f945844818fd751ea735095fe.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","mountains","frozen","sea","jungle","frozen","dimension"],"characterClass":"Kraken","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/ee/b1/f4/eeb1f41f241a694b9e2b7a7098891cc9.jpg","male":"https://i.pinimg.com/originals/ee/b1/f4/eeb1f41f241a694b9e2b7a7098891cc9.jpg"},"name":"","type":"creature","gender":"","territory":["dungeon","town","dimension","court"],"characterClass":"Mimic","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/a1/e3/2e/a1e32e9ef22c7bd466c56cc067d80656.jpg","male":"https://cdna.artstation.com/p/assets/images/images/006/202/534/large/olga-kolesnikova-incubus5.jpg?1496772183"},"name":"","type":"creature","gender":"","territory":["forest","dungeon","mountains","steppes","sea","desert","jungle","town","dimension","court"],"characterClass":"Succubus/Incubus","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"male":"https://i.pinimg.com/originals/98/5a/00/985a005ff1245e7ad3a330d1805242bf.jpg","female":"https://i.pinimg.com/736x/d6/07/ae/d607ae60170b210aa2cbe634616a0494.jpg"},"name":"","type":"creature","gender":"","territory":["forest","steppes","jungle","dimension"],"characterClass":"Hunting Thorn","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/12ac6727-eea5-4504-b8e4-d2e822342075/d4ewqxk-c77a8df8-33ab-4c51-af7c-b710a7f1d1a3.jpg?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzEyYWM2NzI3LWVlYTUtNDUwNC1iOGU0LWQyZTgyMjM0MjA3NVwvZDRld3F4ay1jNzdhOGRmOC0zM2FiLTRjNTEtYWY3Yy1iNzEwYTdmMWQxYTMuanBnIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.dsxUkuM-7sK01CE8xuD0vqbH3A7y71Z7beHdeOH9cgw","male":"https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/12ac6727-eea5-4504-b8e4-d2e822342075/d4ewqxk-c77a8df8-33ab-4c51-af7c-b710a7f1d1a3.jpg?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzEyYWM2NzI3LWVlYTUtNDUwNC1iOGU0LWQyZTgyMjM0MjA3NVwvZDRld3F4ay1jNzdhOGRmOC0zM2FiLTRjNTEtYWY3Yy1iNzEwYTdmMWQxYTMuanBnIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.dsxUkuM-7sK01CE8xuD0vqbH3A7y71Z7beHdeOH9cgw"},"name":"","type":"creature","gender":"","territory":["forest","mountains","jungle","dimension"],"characterClass":"Dendro Beast","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"female":"https://i.pinimg.com/originals/1f/04/e4/1f04e4afdf7fab693e801c2bb32213e2.jpg","male":"https://i.pinimg.com/originals/1f/04/e4/1f04e4afdf7fab693e801c2bb32213e2.jpg"},"name":"","type":"creature","gender":"","territory":["forest","mountains","steppes","frozen","town","dimension"],"characterClass":"Giant Roc","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]},{"description":"","portrait":{"male":"https://pbs.twimg.com/media/DpEbF_UU0AA8kfm.jpg","female":"https://i.pinimg.com/originals/18/f6/a6/18f6a63d597ddfde48829e76c8d926ca.png"},"name":"","type":"creature","gender":"","territory":["dungeon","mountains","desert","dimension"],"characterClass":"Minotaur","index":null,"alias":"","age":26,"stats":{"str":18,"dex":14,"con":14,"sta":10,"app":8,"pow":12},"martialProwess":7,"damageBonus":5,"defenseValue":15,"hitpoints":70,"tempHitpoints":70,"tempSanity":20,"sanity":60,"charisma":6,"actions":[{"name":"Attack"},{"name":"Curse"},{"name":"Bless"},{"name":"Heal"},{"name":"Haggle"},{"name":"Persuade"},{"name":"Intimidate"},{"name":"Pickpocket"},{"name":"Manipulate Mechanism"}],"pPerception":11,"weapons":[{"name":"Bite","type":"Melee","mp":0,"range":5,"damage":[4,8,12]},{"name":"Claw","type":"Melee","mp":0,"range":35,"damage":[4,8,12]}],"loot":[{"money":{"gold":10,"silver":10,"copper":10,"jewels":0},"anatomy":{},"items":"Key, apple, bread, bacon"}]}]};
 
 /***/ }),
 
@@ -18963,13 +20705,17 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].mixin({
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "routes", function() { return routes; });
 /* harmony import */ var _components_Home_vue__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./components/Home.vue */ "./src/components/Home.vue");
-/* harmony import */ var _components_Demo_vue__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./components/Demo.vue */ "./src/components/Demo.vue");
-/* harmony import */ var _components_Game_vue__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./components/Game.vue */ "./src/components/Game.vue");
-/* harmony import */ var _components_Contact_vue__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./components/Contact.vue */ "./src/components/Contact.vue");
-/* harmony import */ var _components_CCreation_vue__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./components/CCreation.vue */ "./src/components/CCreation.vue");
-/* harmony import */ var _components_environment_Loaded_vue__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./components/environment/Loaded.vue */ "./src/components/environment/Loaded.vue");
-/* harmony import */ var _components_environment_Encounter_vue__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./components/environment/Encounter.vue */ "./src/components/environment/Encounter.vue");
-/* harmony import */ var _components_About_vue__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./components/About.vue */ "./src/components/About.vue");
+/* harmony import */ var _components_Game_vue__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./components/Game.vue */ "./src/components/Game.vue");
+/* harmony import */ var _components_Contact_vue__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./components/Contact.vue */ "./src/components/Contact.vue");
+/* harmony import */ var _components_CCreation_vue__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./components/CCreation.vue */ "./src/components/CCreation.vue");
+/* harmony import */ var _components_PrivacyPolicy_vue__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./components/PrivacyPolicy.vue */ "./src/components/PrivacyPolicy.vue");
+/* harmony import */ var _components_Tutorial_vue__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./components/Tutorial.vue */ "./src/components/Tutorial.vue");
+/* harmony import */ var _components_Advice_vue__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./components/Advice.vue */ "./src/components/Advice.vue");
+/* harmony import */ var _components_environment_Loaded_vue__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./components/environment/Loaded.vue */ "./src/components/environment/Loaded.vue");
+/* harmony import */ var _components_environment_Encounter_vue__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./components/environment/Encounter.vue */ "./src/components/environment/Encounter.vue");
+/* harmony import */ var _components_About_vue__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./components/About.vue */ "./src/components/About.vue");
+
+
 
 
 
@@ -18983,25 +20729,31 @@ var routes = [{
   component: _components_Home_vue__WEBPACK_IMPORTED_MODULE_0__["default"]
 }, {
   path: "/game",
-  component: _components_Game_vue__WEBPACK_IMPORTED_MODULE_2__["default"]
-}, {
-  path: "/demo",
-  component: _components_Demo_vue__WEBPACK_IMPORTED_MODULE_1__["default"]
+  component: _components_Game_vue__WEBPACK_IMPORTED_MODULE_1__["default"]
 }, {
   path: "/contact",
-  component: _components_Contact_vue__WEBPACK_IMPORTED_MODULE_3__["default"]
+  component: _components_Contact_vue__WEBPACK_IMPORTED_MODULE_2__["default"]
+}, {
+  path: "/tutorial",
+  component: _components_Tutorial_vue__WEBPACK_IMPORTED_MODULE_5__["default"]
+}, {
+  path: "/advice",
+  component: _components_Advice_vue__WEBPACK_IMPORTED_MODULE_6__["default"]
 }, {
   path: "/character-creation",
-  component: _components_CCreation_vue__WEBPACK_IMPORTED_MODULE_4__["default"]
+  component: _components_CCreation_vue__WEBPACK_IMPORTED_MODULE_3__["default"]
+}, {
+  path: "/privacy-policy",
+  component: _components_PrivacyPolicy_vue__WEBPACK_IMPORTED_MODULE_4__["default"]
 }, {
   path: "/loaded",
-  component: _components_environment_Loaded_vue__WEBPACK_IMPORTED_MODULE_5__["default"]
+  component: _components_environment_Loaded_vue__WEBPACK_IMPORTED_MODULE_7__["default"]
 }, {
   path: "/encounter",
-  component: _components_environment_Encounter_vue__WEBPACK_IMPORTED_MODULE_6__["default"]
+  component: _components_environment_Encounter_vue__WEBPACK_IMPORTED_MODULE_8__["default"]
 }, {
   path: "/about",
-  component: _components_About_vue__WEBPACK_IMPORTED_MODULE_7__["default"]
+  component: _components_About_vue__WEBPACK_IMPORTED_MODULE_9__["default"]
 }];
 
 /***/ }),

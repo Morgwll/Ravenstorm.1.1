@@ -13,7 +13,7 @@ body {
   margin: 0 auto;
 }
 .mainWrapper {
-  min-height: calc(100vh - 100px);
+  // min-height: calc(100vh - 100px);
 }
 .mainNav {
   display: inline-flex;
@@ -46,12 +46,33 @@ body {
     position: absolute;
     left: 50px;
     top: 20%;
+    @media only screen and (max-width: 960px) {
+      left: 30px;
+      top: 30px;
+    }
+    @media only screen and (max-width: 786px) {
+      left: 20px;
+      top: 0;
+    }
     h1 {
       font-size: 6rem;
       margin: 30px 0;
+      @media only screen and (max-width: 960px) {
+        font-size: 4rem;
+        margin: 15px 0;
+      }
+      @media only screen and (max-width: 786px) {
+        font-size: 2rem;
+      }
     }
     h3 {
       max-width: 600px;
+      @media only screen and (max-width: 960px) {
+        font-size: 1.5rem;
+      }
+      @media only screen and (max-width: 786px) {
+        font-size: 1rem;
+      }
     }
   }
 }
@@ -61,6 +82,11 @@ body {
 }
 .contentText {
   width: calc(100% - 140px);
+  max-width: 1220px;
+  margin: 0 auto;
+}
+.characterCreation {
+  width: calc(100% - 30px);
   max-width: 1220px;
   margin: 0 auto;
 }

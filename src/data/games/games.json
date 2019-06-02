@@ -10,7 +10,7 @@
         {
           "portrait": "https://i.kinja-img.com/gawker-media/image/upload/s--NdbChKcZ--/c_scale,f_auto,fl_progressive,q_80,w_800/18j3zwhxy85iyjpg.jpg",
           "characterType": "pc",
-          "characterClass": "Guardian",
+          "characterClass": "Warrior",
           "type": "creature",
           "name": "Rykha",
           "index": "",
@@ -29,7 +29,7 @@
           "damageBonus": 6,
           "defenseValue": 14,
           "hitpoints": 75,
-          "tempHitpoints": 75,
+          "tempHitpoints": 70,
           "sanity": 50,
           "tempSanity": 50,
           "charisma": 8,
@@ -39,28 +39,37 @@
             { "name": "Haggle" },
             { "name": "Persuade" },
             { "name": "Intimidate" },
-            { "name": "Pickpocket" },
+            { "name": "Perception" },
+            { "name": "Jump" },
+            { "name": "Climb" },
+            { "name": "Swim" },
             { "name": "Manipulate Mechanism" }
           ],
           "classActions": [
-            { "name": "Pickpocket" },
             { "name": "Ranged" },
             { "name": "Brawl" },
             { "name": "Melee" },
-            { "name": "Hunt" },
-            { "name": "Swim" },
-            { "name": "Disarm Trap" }
+            { "name": "Swim" }
           ],
           "pPerception": 12,
           "weapons": [
             {
               "name": "Long Sword",
+              "type": "Melee",
+              "mp": 0,
+              "range": 5,
+              "damage": [4, 7, 12]
+            },
+            {
+              "name": "Uftberht",
+              "type": "Melee",
               "mp": 0,
               "range": 5,
               "damage": [4, 7, 12]
             },
             {
               "name": "Composite Bow",
+              "type": "Ranged",
               "mp": 0,
               "range": 35,
               "damage": [4, 8, 12]
@@ -103,7 +112,7 @@
           "damageBonus": 6,
           "defenseValue": 15,
           "hitpoints": 70,
-          "tempHitpoints": 47,
+          "tempHitpoints": 70,
           "sanity": 60,
           "tempSanity": 48,
           "charisma": 8,
@@ -112,30 +121,40 @@
             { "name": "Heal" },
             { "name": "Haggle" },
             { "name": "Persuade" },
+            { "name": "Perception" },
+            { "name": "Jump" },
+            { "name": "Climb" },
+            { "name": "Swim" },
             { "name": "Intimidate" },
-            { "name": "Pickpocket" },
             { "name": "Manipulate Mechanism" }
           ],
           "classActions": [
-            { "name": "Pickpocket" },
             { "name": "Ranged" },
             { "name": "Brawl" },
             { "name": "Melee" },
             { "name": "Hunt" },
-            { "name": "Swim" },
             { "name": "Disarm Trap" }
           ],
           "pPerception": 12,
           "weapons": [
             {
-              "name": "Club",
+              "name": "Spear",
               "mp": 0,
+              "type": "Melee",
+              "range": 10,
+              "damage": [4, 8, 12]
+            },
+            {
+              "name": "Dagger",
+              "mp": 0,
+              "type": "Melee",
               "range": 5,
-              "damage": [4, 8, 10]
+              "damage": [3, 5, 9]
             },
             {
               "name": "Composite Bow",
               "mp": 0,
+              "type": "Ranged",
               "range": 45,
               "damage": [4, 8, 12]
             }
@@ -160,10 +179,10 @@
           "characterType": "pc",
           "characterClass": "Shaman",
           "type": "creature",
-          "name": "Yorubo",
+          "name": "Nai",
           "index": "",
-          "alias": "the Greedy",
-          "age": 26,
+          "alias": "Shamalang",
+          "age": 32,
           "gender": "male",
           "stats": {
             "str": 14,
@@ -179,15 +198,18 @@
           "hitpoints": 70,
           "tempHitpoints": 70,
           "sanity": 60,
-          "tempSanity": 60,
+          "tempSanity": 40,
           "charisma": 12,
           "actions": [
             { "name": "Attack" },
             { "name": "Heal" },
             { "name": "Haggle" },
             { "name": "Persuade" },
+            { "name": "Perception" },
+            { "name": "Jump" },
+            { "name": "Climb" },
+            { "name": "Swim" },
             { "name": "Intimidate" },
-            { "name": "Pickpocket" },
             { "name": "Manipulate Mechanism" },
             { "name": "Curse" },
             { "name": "Bless" },
@@ -199,25 +221,25 @@
             { "name": "Illusion of Self" }
           ],
           "classActions": [
-            { "name": "Pickpocket" },
             { "name": "Ranged" },
             { "name": "Brawl" },
             { "name": "Melee" },
-            { "name": "Hunt" },
-            { "name": "Swim" },
-            { "name": "Disarm Trap" }
+            { "name": "Herbalism" },
+            { "name": "Healing" }
           ],
           "pPerception": 12,
           "weapons": [
             {
               "name": "Staff",
               "mp": 0,
+              "type": "Melee",
               "range": 10,
               "damage": [3, 6, 8]
             },
             {
               "name": "Composite Bow",
               "mp": 0,
+              "type": "Ranged",
               "range": 35,
               "damage": [4, 8, 12]
             }

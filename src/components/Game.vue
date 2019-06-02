@@ -63,6 +63,7 @@ export default {
       const chosenGame = this.gamesInfo.find(game => {
         return game;
       });
+      console.log(this.$store.state.characterList);
       this.$store.state.characterList.push(chosenGame.contents.characters);
       this.$store.state.characterList.push(chosenGame.contents.plots);
       this.$store.state.characterList.push(chosenGame.notes);
